@@ -1,0 +1,22 @@
+======Individuals and Alternatives=====
+Number of individuals:                 100
+Total number of alternatives:          300
+Average number of alternatives:        3.0
+Minimum number of alternatives:        1
+Maximum number of alternatives:        7
+
+===========Energy Consumption==========
+Initial energy consumption:            771.3022082531995
+Minimum potential energy consumption:  78.73995173385616
+Potential energy consumption gains:    692.5622565193434
+
+==========Utility and Surplus==========
+Initial consumer surplus:              3362.7957396297834
+Minimum consumer surplus (gross):      44.31123186588015
+Maximum budget necessary:              3318.4845077639034
+
+=========Technical Informations========
+The data were randomly generated
+The data are sorted
+The data are cleaned
+708 Pareto-dominated alternatives were removed.

@@ -1,0 +1,5 @@
+\select@language {english}
+\contentsline {section}{\numberline {1}The Marginal Cost Pricing Policy}{1}{section.1}
+\contentsline {section}{\numberline {2}Equivalence Between the MCP and the Algorithm}{3}{section.2}
+\contentsline {section}{\numberline {3}Efficiency Curve}{5}{section.3}
+\contentsline {section}{\numberline {4}Example}{6}{section.4}
