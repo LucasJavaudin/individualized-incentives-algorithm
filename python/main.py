@@ -18,7 +18,7 @@ import os
 
 class Data:
 
-    """A Data object contains all the informations on the
+    """A Data object stores the information on the
     alternatives of the individuals.
     
     A Data object has a list attribute with I elements where I is the number of
@@ -1371,6 +1371,124 @@ class AlgorithmResults:
         )
 
 
+class Regression:
+
+    """A Regression object stores information on the regression between two
+    variables. 
+    """
+
+    def __init__(self, x, y):
+        """Initiate variables, perform a regression and create a legend. """
+        self.x = x
+        self.y = y
+        self.degree = 3
+        # Do a polynomial regression.
+        self._polynomial_regression()
+        # Create a legend.
+        self._legend(4)
+
+    def _polynomial_regression(self):
+        """Compute the coefficients, the covariance matrix, the t-statistics 
+        and the significance (boolean) of a polynomial regression.
+        """
+        # Compute the coefficients and the covariance matrix of the regression
+        # for a polynomial with 3 degrees.
+        self.coefficients, self.covariance = np.polyfit(self.x, 
+                                                        self.y, 
+                                                        self.degree, 
+                                                        cov=True)
+        # Compute the statistical significance of the coefficients (estimate
+        # divided by its standard error).
+        t_statistics = []
+        for i in range(self.degree+1):
+            t = abs(self.coefficients[i]) / self.covariance[i, i]**(1/2)
+            t_statistics.append(t)
+        # The coefficients are statistically significant if the t-statistic is
+        # greater than 1.96.
+        t_statistics = np.array(t_statistics)
+        print(t_statistics)
+        self.significance = t_statistics > 1.96
+        # Store the number of significant coefficients.
+        self.nb_significant = sum(self.significance)
+
+    def _r_squared(self):
+        """Compute the R² of the regression.
+        """
+        # Compute the predicted values of y using only the significant
+        # coefficients.
+        self.poly = np.poly1d(self.coefficients)
+        y_hat = self.poly(self.x)
+        # Compute the mean of y.
+        y_bar = sum(self.y)/len(self.y)
+        y_bars = np.repeat(y_bar, len(self.y))
+        # Compute the sum of squared residuals and the total sum of squares.
+        SSR = np.sum((y_hat - self.y)**2)
+        SST = np.sum((y_bars - self.y)**2)
+        # Compute the R².
+        self.R2 = SSR / SST
+
+    def _legend(self, r):
+        """Create a string with information on the regression that can be
+        displayed through the legend of a plot.
+
+        :r: precision of round
+
+        """
+        if self.nb_significant == 0:
+            self.legend = '$y$ = 0\n$R^2$=0'
+            self.poly = np.poly1d(0)
+        else:
+            # Create a string with the equation of the regression line.
+            equation = '$y$ = '
+            # Store the value of the significant coefficients and the associated
+            # degree of x.
+            significant_coefficients = [
+                                        (self.degree-i, c) for i, c 
+                                        in enumerate(self.coefficients) 
+                                        if self.significance[i]
+                                       ]
+            # Add the value of the significant coefficient with the higher degree.
+            equation += str(round(significant_coefficients[0][1], r))
+            # Add x with its associated degree.
+            equation += ' ' + self._x_string(significant_coefficients[0][0])
+            # For the other significant coefficients (if they exist), add their
+            # value and the x associated.
+            for i in range(self.nb_significant-1):
+                # Add the sign of the coefficient.
+                if significant_coefficients[i+1][1] > 0:
+                    equation += ' + '
+                else:
+                    equation += ' - '
+                # Add the absolute value of the coefficient.
+                equation += str(abs(round(significant_coefficients[i+1][1], r)))
+                # Add the x with its associated degree.
+                equation += ' ' + self._x_string(significant_coefficients[i+1][0])
+            # Compute the R².
+            self._r_squared()
+            # The first line of the string is the equation and the second line is
+            # the R².
+            self.legend = equation + '\n$R^2$ = ' + str(round(self.R2, r))
+
+    def _x_string(self, deg):
+        """Create a string with x and a specified exponent.
+
+        For instance, if degree is d>1, return '$x^d$'.
+        If the exponent is 1, return '$x$'.
+        If the exponent is 0, return ''.
+
+        :degree: degree associated, must be a int
+        :returns: a string
+
+        """
+        if deg == 0:
+            s = ''
+        elif deg == 1:
+            s = r'$x$'
+        elif deg >= 2:
+            s = r'$x' + str(deg) + '$'
+        return s
+        
+
 ###############
 #  Functions  #
 ###############
@@ -1462,7 +1580,7 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
         plt.close()
 
 
-def _plot_scatter(x, y, title, xlabel, ylabel, filename=None):
+def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
     """Plot a scatter.
 
     :x: list or numpy array with the x-coordinates
@@ -1470,6 +1588,8 @@ def _plot_scatter(x, y, title, xlabel, ylabel, filename=None):
     :title: title of the graph
     :xlabel: label of the x-axis
     :ylabel: label of the y-axis
+    :regression: if true, perform a regression and display the regression line
+    and a legend
     :file: string with the name of the file where the graph is saved, if
     None show the graph but does not save it, default is None
 
@@ -1478,6 +1598,16 @@ def _plot_scatter(x, y, title, xlabel, ylabel, filename=None):
     fig, ax = plt.subplots()
     # Plot the scatter.
     ax.scatter(x, y, s=5)
+    # Perform a regression if necessary.
+    if regression:
+        reg = Regression(x, y)
+        xs = np.linspace(*ax.get_xlim(), 1000)
+        ys = reg.poly(xs)
+        ax.plot(xs, ys, color='red', label=reg.legend)
+        ax.legend()
+    # Do not show negative values on the y-axis if all values are positive.
+    if ax.get_ylim()[0] < 0 and min(y) >= 0:
+        ax.set_ylim(bottom=0)
     # Add the title and the axis label.
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -1569,43 +1699,71 @@ def full_simulation(verbose=True, **kwargs):
               + 's')
 
 
-def complexity_individuals(start_value, end_value, interval, verbose=True, 
+def complexity_individuals(start, stop, step, verbose=True, 
         **kwargs):
-    """TODO: Docstring for .
+    """Run multiple simulations with a varying number of individuals and compute
+    time complexity of the algorithm.
 
+    The simulation are run with an infinite budget, by default.
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
+    All the graphs generated are stored in the directory complexity/.
 
-    :min_individuals: TODO
-    :max_individuals: TODO
-    :interval: TODO
+    :start: start value for the interval of number of individuals
+    :stop: end value for the interval of number of individuals, this value is
+    not include in the interval
+    :step: spacing between values in the interval
     :verbose: if True, a progress bar and some informations are displayed during
     the process, default is True
-    :returns: TODO
 
     """
-    X = np.arange(start_value, end_value, interval, dtype=int)
+    # Create the directory complexity/.
+    try:
+        os.mkdir('complexity')
+    except FileExistsError:
+        pass
+    # Compute the interval of values for the number of individuals.
+    X = np.arange(start, stop, step, dtype=int)
     if verbose:
         # Print a progress bar of duration the number of simulations.
         bar = _known_custom_bar(len(X), 'Running simulations')
+    # Generate empty lists to store the computing times.
     generating_times = []
     cleaning_times = []
     running_times = []
+    # Run a simulation for each value in the interval and store relevant
+    # results.
     for i, x in enumerate(X):
         if verbose:
             bar.update(i)
         data = Data()
         time0 = time.time()
+        # Generate the data.
         data.generate(individuals=x, verbose=False, **kwargs)
         time1 = time.time()
         generating_times.append(time1 - time0)
+        # Clean the data.
         data.clean(verbose=False)
         time2 = time.time()
         cleaning_times.append(time2 - time1)
-        results = data.run_algorithm(verbose=False)
+        # Run the algorithm.
+        data.run_algorithm(verbose=False)
         time3 = time.time()
         running_times.append(time3 - time2)
     bar.finish()
+    # Plot graphs showing time complexity.
+    _plot_scatter(X, generating_times, 
+            'Time Complexity with the Number of Individuals ' 
+            + '(Generating Time)', 
+            'Number of individuals', 'Generating time',
+            filename='complexity/generating_time.png')
+    _plot_scatter(X, cleaning_times, 
+            'Time Complexity with the Number of Individuals '
+            + '(Cleaning Time)',
+            'Number of individuals', 'Cleaning time',
+            filename='complexity/cleaning_times.png')
     _plot_scatter(X, running_times, 
-            'Time Complexity of the Algorithm with the Number of Individuals', 
-            'Number of individuals', 'Running time')
+            'Time Complexity with the Number of Individuals '
+            + '(Running Time)',
+            'Number of individuals', 'Running time',
+            filename='complexity/running_time.png')
