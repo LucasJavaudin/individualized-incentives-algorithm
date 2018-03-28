@@ -55,7 +55,7 @@ class Data:
         self.read_time = None
         self.generating_time = None
         self.output_data_time = None
-        self.output_informations_time = None
+        self.output_characteristics_time = None
 
     def _append(self, narray):
         """Append the specified numpy array to the Data object.
@@ -96,7 +96,7 @@ class Data:
         consumption of the alternatives, default is comma
         :comments: line starting with this string are not read, should be a
         string, default is #
-        :verbose: if True, a progress bar and some informations are displayed during
+        :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
 
         """
@@ -162,7 +162,7 @@ class Data:
         Energy = alpha * deterministic_utility^gamma + beta.
 
         :individuals: number of individuals in the generated data, should be an
-        integer greater than 2, default is 100
+        integer greater than 2, default is 1000
         :mean_nb_alternatives: the parameter of the Poisson law used to generate the
         number of alternatives is (mean_nb_alternatives - 1), should be strictly
         greater than 1, should be an integer if use_poisson is false, default is 10
@@ -184,7 +184,7 @@ class Data:
         individuals, default is True
         :use_gumbel: if True the Gumbel distribution is used to generate the random
         utility, else the Logistic distribution is used, default is False
-        :verbose: if True, a progress bar and some informations are displayed during
+        :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
 
         """
@@ -255,7 +255,7 @@ class Data:
         consumption of the alternatives, default is comma
         :comments: string used for the comments in the output file, should be a
         string, default is #
-        :verbose: if True, a progress bar and some informations are displayed during
+        :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
 
         """
@@ -285,12 +285,12 @@ class Data:
         # Store the time spent to output data.
         self.output_data_time = time.time() - init_time
 
-    def output_informations(self, filename, verbose=True):
-        """Write a file with some informations on the data.
+    def output_characteristics(self, filename, verbose=True):
+        """Write a file with some characteristics on the data.
 
-        :filename: string with the name of the file where the informations are 
-        written
-        :verbose: if True, some informations are displayed during the process,
+        :filename: string with the name of the file where the characteristics 
+        are written
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -304,7 +304,7 @@ class Data:
             print('Unable to open the file ' + str(filename))
             raise
         if verbose:
-            print('Writing some informations about the data on a file...')
+            print('Writing some characteristics about the data on a file...')
         size=40
         # Display the number of individuals, the total number of alternatives,
         # the average number of alternatives, the minimum number of alternatives
@@ -378,7 +378,7 @@ class Data:
                          )
         output_file.write('\n\n')
         # Indicate if the data were randomly generated or imported.
-        output_file.write('Technical Informations'.center(size-1, '='))
+        output_file.write('Technical Information'.center(size-1, '='))
         if self.generated_data:
             output_file.write('\nThe data were randomly generated')
         else:
@@ -396,13 +396,13 @@ class Data:
                               + ' Pareto-dominated alternatives were removed.')
         else:
             output_file.write('\nThe data are not cleaned')
-        # Store the time spent to output informations.
-        self.output_informations_time = time.time() - init_time
+        # Store the time spent to output characteristics.
+        self.output_characteristics_time = time.time() - init_time
 
     def clean(self, verbose=True):
         """Remove the Pareto-dominated alternatives.
 
-        :verbose: if True, a progress bar and some informations are displayed during
+        :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
         
         """
@@ -456,7 +456,7 @@ class Data:
     def sort(self, verbose=True):
         """Sort the data by utility, then by energy consumption.
 
-        :verbose: if True, a progress bar and some informations are displayed during
+        :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
 
         """
@@ -709,7 +709,7 @@ class Data:
         incentives to give, default is np.infty (the budget is unlimited).
         :force: if True, force the algorithm to run even if it is not necessary,
         default is True.
-        :verbose: if True, a progress bar and some informations are displayed 
+        :verbose: if True, a progress bar and some information are displayed 
         during the process, default is True
         :returns: an AlgorithmResults object
 
@@ -764,15 +764,15 @@ class Data:
                 results.iteration += 1
                 # Select the individual with the most efficient jump.
                 selected_individual = np.argmax(best_efficiencies)
-                # Store informations on the jump (selected individual, previous
+                # Store information on the jump (selected individual, previous
                 # alternative, next alternative).
                 previous_alternative = \
                     results.optimal_state[selected_individual]
                 next_alternative = best_alternatives[selected_individual]
-                jump_informations = [selected_individual,
+                jump_information = [selected_individual,
                                      previous_alternative,
                                      next_alternative]
-                results.jumps_history.append(jump_informations)
+                results.jumps_history.append(jump_information)
                 # Store the efficiency of the jump.
                 jump_efficiency = best_efficiencies[selected_individual]
                 results.efficiencies_history.append(jump_efficiency)
@@ -787,7 +787,7 @@ class Data:
                 best_efficiencies[selected_individual] = new_best_efficiency
                 best_alternatives[selected_individual] = new_best_alternative
                 # Increase the expenses by the amount of incentives of the jump.
-                incentives = self._incentives_amount(*jump_informations)
+                incentives = self._incentives_amount(*jump_information)
                 results.expenses += incentives
                 # Increase the total energy gains by the amount of energy gains
                 # of the jump.
@@ -867,7 +867,7 @@ class AlgorithmResults:
         # The variable efficiencies_history is a list where the efficiency of
         # each jump is stored.
         self.efficiencies_history = []
-        # The variable overshot_jump is used to store informations on the
+        # The variable overshot_jump is used to store information on the
         # overshot jump (the jump that is removed in case of overshot).
         self.overshot_jump = None
         # The variable run_algorithm is True if the algorithm was fully run.
@@ -879,12 +879,12 @@ class AlgorithmResults:
         self.algorithm_running_time = None
         self.computing_results_time = None
         self.output_results_time = None
-        self.output_informations_time = None
+        self.output_characteristic_time = None
 
     def compute_results(self, verbose=True):
         """Compute relevant results from the raw results of the algorithm.
 
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -989,12 +989,12 @@ class AlgorithmResults:
         # Store the time spent computing results.
         self.computing_results_time = time.time() - init_time
 
-    def output_informations(self, filename, verbose=True):
-        """Write a file with some informations on the results of the algorithm.
+    def output_characteristics(self, filename, verbose=True):
+        """Write a file with some characteristics on the results of the algorithm.
 
-        :filename: string with the name of the file where the informations are 
+        :filename: string with the name of the file where the information are 
         written
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1013,7 +1013,7 @@ class AlgorithmResults:
         if not self.computed_results:
             self.compute_results(verbose=verbose)
         if verbose:
-            print('Writing some informations about the results on a file...')
+            print('Writing some characteristics about the results on a file...')
         size = 60
         # Display the budget, the expenses, the percentage of budget spent
         # and the remaining budget.
@@ -1044,7 +1044,7 @@ class AlgorithmResults:
         output_file.write('\nOptimal energy consumption:'.ljust(size) 
                           + "{:,.4f}".format(self.optimal_energy))
         output_file.write('\n\n')
-        # Display informations on the distance between the optimal state and the
+        # Display information on the distance between the optimal state and the
         # last state (first best).
         output_file.write('Distance from First Best'.center(size-1, '='))
         output_file.write('\nMaximum budget necessary:'.ljust(size) 
@@ -1109,7 +1109,7 @@ class AlgorithmResults:
                           + "{:,.4f}".format(self.bound_size))
         output_file.write('\n\n')
         # Display computation times.
-        output_file.write('Technical informations'.center(size-1, '='))
+        output_file.write('Technical Information'.center(size-1, '='))
         if not self.data.read_time is None:
             output_file.write('\nTime to read the data (s):'.ljust(size)
                               + "{:,.4f}".format(self.data.read_time))
@@ -1119,11 +1119,11 @@ class AlgorithmResults:
         if not self.data.output_data_time is None:
             output_file.write('\nTime to output the data (s):'.ljust(size)
                               + "{:,.4f}".format(self.data.output_data_time))
-        if not self.data.output_informations_time is None:
-            output_file.write(('\nTime to output informations on the data '
+        if not self.data.output_characteristics_time is None:
+            output_file.write(('\nTime to output characteristics on the data '
                               + '(s):').ljust(size)
                               + "{:,.4f}".format(
-                                  self.data.output_informations_time))
+                                  self.data.output_characteristics_time))
         if not self.algorithm_running_time is None:
             output_file.write('\nTime to run the algorithm (s):'.ljust(size)
                               + "{:,.4f}".format(self.algorithm_running_time))
@@ -1134,11 +1134,11 @@ class AlgorithmResults:
         if not self.output_results_time is None:
             output_file.write('\nTime to output the results (s):'.ljust(size)
                               + "{:,.4f}".format(self.output_results_time))
-        # Store the time spent to output informations.
-        self.output_informations_time = time.time() - init_time
-        output_file.write(('\nTime to output informations on the results '
+        # Store the time spent to output characteristics.
+        self.output_characteristics_time = time.time() - init_time
+        output_file.write(('\nTime to output characteristics on the results '
                           + '(s):').ljust(size)
-                          + "{:,.4f}".format(self.output_informations_time))
+                          + "{:,.4f}".format(self.output_characteristics_time))
 
     def output_results(self, filename, verbose=True):
         """Write a file with the results of the algorithm.
@@ -1148,7 +1148,7 @@ class AlgorithmResults:
 
         :filename: string with the name of the file where the results are 
         written
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1189,7 +1189,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1211,7 +1211,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1234,7 +1234,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1257,7 +1257,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1285,7 +1285,7 @@ class AlgorithmResults:
         None show the graph but does not save it, default is None
         :bounds: if True, plot the lower and upper bounds, default is True
         :difference: if True, plot the bound differences, default is True
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1332,7 +1332,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1355,7 +1355,7 @@ class AlgorithmResults:
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
-        :verbose: if True, some informations are displayed during the process,
+        :verbose: if True, some information are displayed during the process,
         default is True
 
         """
@@ -1631,7 +1631,7 @@ def simulation(verbose=True, **kwargs):
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
 
-    :verbose: if True, display progress bars and some informations
+    :verbose: if True, display progress bars and some information
     :returns: an AlgorithmResults object with the results of the algorithm run
 
     """
@@ -1644,55 +1644,77 @@ def simulation(verbose=True, **kwargs):
     return results
 
 
-def full_simulation(verbose=True, **kwargs):
+def full_simulation(directory='files', verbose=True, **kwargs):
     """Generate all the files and graphs while generating random data and
     running the algorithm.
 
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
-    The generated files are the data, data informations, the results and results
-    informations.
+    The generated files are the data, data characteristics, the results and results
+    characteristics.
     The generated graphs are efficiency curve, efficiency evolution, incentives
     evolution, energy gains evolution, bounds, individuals who moved and
     individuals at first best.
-    All the files and graphs generated are stored in the directory files/.
+    All the files and graphs generated are stored in the same directory.
 
-    :verbose: if True, display progress bars and some informations
+    :directory: directory where the files are stored, must be a string, default
+    is 'files'
+    :verbose: if True, display progress bars and some information
 
     """
     # Store the starting time.
     init_time = time.time()
     if verbose:
         print('Running a full simulation...')
-    # Create the directory files/.
+    # Create the directory used to store the files.
     try:
-        os.mkdir('files')
+        os.mkdir(directory)
     except FileExistsError:
         pass
     # Run the simulation.
     results = simulation(verbose=verbose, **kwargs)
     # Generate the files and the graphs.
-    results.data.output_data(filename='files/data.txt', verbose=verbose)
-    results.data.output_informations(filename='files/data_informations.txt',
-                                     verbose=verbose)
-    results.output_results(filename='files/results.txt', verbose=verbose)
-    results.output_informations(filename='files/results_informations.txt', 
-                                verbose=verbose)
-    results.plot_efficiency_curve(filename='files/efficiency_curve.png',
-                                  verbose=verbose)
-    results.plot_efficiency_evolution(filename='files/efficiency_evolution.png',
-                                      verbose=verbose)
-    results.plot_incentives_evolution(filename='files/incentives_evolution.png',
-                                      verbose=verbose)
-    results.plot_energy_gains_evolution(filename='files/energy_gains_evolution.png',
-                                        verbose=verbose)
-    results.plot_bounds(filename='files/bounds.png', verbose=verbose)
-    results.plot_individuals_who_moved(filename='files/individuals_who_moved.png',
-                                       verbose=verbose)
-    results.plot_individuals_at_first_best(
-            filename='files/individuals_at_first_best.png',
+    results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
+    results.data.output_characteristics(
+            filename=directory+'/data_characteristics.txt',
             verbose=verbose
-    )
+            )
+    results.output_results(
+            filename=directory+'/results.txt', 
+            verbose=verbose
+            )
+    results.output_characteristics(
+            filename=directory+'/results_characteristics.txt', 
+            verbose=verbose
+            )
+    results.plot_efficiency_curve(
+            filename=directory+'/efficiency_curve.png',
+            verbose=verbose
+            )
+    results.plot_efficiency_evolution(
+            filename=directory+'/efficiency_evolution.png',
+            verbose=verbose
+            )
+    results.plot_incentives_evolution(
+            filename=directory+'/incentives_evolution.png',
+            verbose=verbose
+            )
+    results.plot_energy_gains_evolution(
+            filename=directory+'/energy_gains_evolution.png',
+            verbose=verbose
+            )
+    results.plot_bounds(
+            filename=directory+'/bounds.png', 
+            verbose=verbose
+            )
+    results.plot_individuals_who_moved(
+            filename=directory+'/individuals_who_moved.png',
+            verbose=verbose
+            )
+    results.plot_individuals_at_first_best(
+            filename=directory+'/individuals_at_first_best.png',
+            verbose=verbose
+            )
     # Store the total time to run the simulation.
     total_time = time.time() - init_time
     if verbose:
@@ -1715,7 +1737,7 @@ def complexity_individuals(start, stop, step, verbose=True,
     :stop: end value for the interval of number of individuals, this value is
     not include in the interval
     :step: spacing between values in the interval
-    :verbose: if True, a progress bar and some informations are displayed during
+    :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
@@ -1785,7 +1807,7 @@ def complexity_alternatives(start, stop, step, verbose=True,
     :stop: end value for the interval of average number of alternatives, this 
     value is not include in the interval
     :step: spacing between values in the interval
-    :verbose: if True, a progress bar and some informations are displayed during
+    :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
