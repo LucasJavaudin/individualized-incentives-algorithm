@@ -1225,6 +1225,7 @@ class AlgorithmResults:
                 'Evolution of the Efficiency of the Jumps',
                 'Iterations',
                 'Efficiency',
+                regression=False,
                 filename=filename
         )
 
@@ -1247,6 +1248,7 @@ class AlgorithmResults:
                 'Evolution of the Incentives of the Jumps',
                 'Iterations',
                 'Incentives',
+                regression=False,
                 filename=filename
         )
 
@@ -1269,6 +1271,7 @@ class AlgorithmResults:
                 'Evolution of the Energy Gains of the Jumps',
                 'Iterations',
                 'Energy gains',
+                regression=False,
                 filename=filename
         )
         
@@ -1406,7 +1409,6 @@ class Regression:
         # The coefficients are statistically significant if the t-statistic is
         # greater than 1.96.
         t_statistics = np.array(t_statistics)
-        print(t_statistics)
         self.significance = t_statistics > 1.96
         # Store the number of significant coefficients.
         self.nb_significant = sum(self.significance)
@@ -1485,7 +1487,7 @@ class Regression:
         elif deg == 1:
             s = r'$x$'
         elif deg >= 2:
-            s = r'$x' + str(deg) + '$'
+            s = r'$x^' + str(deg) + '$'
         return s
         
 
@@ -1707,7 +1709,7 @@ def complexity_individuals(start, stop, step, verbose=True,
     The simulation are run with an infinite budget, by default.
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
-    All the graphs generated are stored in the directory complexity/.
+    All the graphs generated are stored in the directory complexity_individuals/.
 
     :start: start value for the interval of number of individuals
     :stop: end value for the interval of number of individuals, this value is
@@ -1717,9 +1719,9 @@ def complexity_individuals(start, stop, step, verbose=True,
     the process, default is True
 
     """
-    # Create the directory complexity/.
+    # Create the directory complexity_individuals/.
     try:
-        os.mkdir('complexity')
+        os.mkdir('complexity_individuals')
     except FileExistsError:
         pass
     # Compute the interval of values for the number of individuals.
@@ -1756,14 +1758,84 @@ def complexity_individuals(start, stop, step, verbose=True,
             'Time Complexity with the Number of Individuals ' 
             + '(Generating Time)', 
             'Number of individuals', 'Generating time',
-            filename='complexity/generating_time.png')
+            filename='complexity_individuals/generating_time.png')
     _plot_scatter(X, cleaning_times, 
             'Time Complexity with the Number of Individuals '
             + '(Cleaning Time)',
             'Number of individuals', 'Cleaning time',
-            filename='complexity/cleaning_times.png')
+            filename='complexity_individuals/cleaning_times.png')
     _plot_scatter(X, running_times, 
             'Time Complexity with the Number of Individuals '
             + '(Running Time)',
             'Number of individuals', 'Running time',
-            filename='complexity/running_time.png')
+            filename='complexity_individuals/running_time.png')
+
+
+def complexity_alternatives(start, stop, step, verbose=True, 
+        **kwargs):
+    """Run multiple simulations with a varying average number of alternatives 
+    and compute time complexity of the algorithm.
+
+    The simulation are run with an infinite budget, by default.
+    To specify the parameters for the generation process, use the same syntax as
+    for the method Data.generate().
+    All the graphs generated are stored in the directory complexity_alternatives/.
+
+    :start: start value for the interval of average number of alternatives
+    :stop: end value for the interval of average number of alternatives, this 
+    value is not include in the interval
+    :step: spacing between values in the interval
+    :verbose: if True, a progress bar and some informations are displayed during
+    the process, default is True
+
+    """
+    # Create the directory complexity_alternatives/.
+    try:
+        os.mkdir('complexity_alternatives')
+    except FileExistsError:
+        pass
+    # Compute the interval of values for the number of individuals.
+    X = np.arange(start, stop, step, dtype=int)
+    if verbose:
+        # Print a progress bar of duration the number of simulations.
+        bar = _known_custom_bar(len(X), 'Running simulations')
+    # Generate empty lists to store the computing times.
+    generating_times = []
+    cleaning_times = []
+    running_times = []
+    # Run a simulation for each value in the interval and store relevant
+    # results.
+    for i, x in enumerate(X):
+        if verbose:
+            bar.update(i)
+        data = Data()
+        time0 = time.time()
+        # Generate the data.
+        data.generate(mean_nb_alternatives=x, verbose=False, **kwargs)
+        time1 = time.time()
+        generating_times.append(time1 - time0)
+        # Clean the data.
+        data.clean(verbose=False)
+        time2 = time.time()
+        cleaning_times.append(time2 - time1)
+        # Run the algorithm.
+        data.run_algorithm(verbose=False)
+        time3 = time.time()
+        running_times.append(time3 - time2)
+    bar.finish()
+    # Plot graphs showing time complexity.
+    _plot_scatter(X, generating_times, 
+            'Time Complexity with the Number of Individuals ' 
+            + '(Generating Time)', 
+            'Number of individuals', 'Generating time',
+            filename='complexity_alternatives/generating_time.png')
+    _plot_scatter(X, cleaning_times, 
+            'Time Complexity with the Number of Individuals '
+            + '(Cleaning Time)',
+            'Number of individuals', 'Cleaning time',
+            filename='complexity_alternatives/cleaning_times.png')
+    _plot_scatter(X, running_times, 
+            'Time Complexity with the Number of Individuals '
+            + '(Running Time)',
+            'Number of individuals', 'Running time',
+            filename='complexity_alternatives/running_time.png')
