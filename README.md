@@ -9,6 +9,7 @@ How-To Run the Algorithm
 There is currently no GUI implemented to run the algorithm.
 You can run the algorithm by typing the command line:
 > python -i /path/to/file/incentives_algorithm.py
+
 Then, you can type commands in the python interpreter.
 
 ### Command full_simulation()
