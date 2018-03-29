@@ -19,9 +19,23 @@ You can run the algorithm by typing the following command line in a terminal.
 
 Then, you can type commands in the python interpreter.
 
-### Command full_simulation()
+### Command _full_simulation()_
 
 This command generate random data, sort the data, remove the Pareto-dominated alternatives and run the algorithm.
+
+#### Parameters
+
+You can change the value of the parameters used in the generating process:
+- _individuals_ (default: 1000): number of individuals generated
+- _mean_nb_alternatives_ (default: 10): average number of alternatives per individual
+- _use_poisson_ (default: True): if True, the number of alternatives is drawn from a Poisson distribution, else the number of alternatives is fixed to mean_nb_alternatives
+- _use_gumbel_ (default: False): if True, stochastic utility is generated from the Gumbel distribution, else the Logistic distribution is used
+- _random_utility_parameter_ (default: 10): parameter of the distribution used to generate stochastic utility (Gumbel or Logistic)
+- _utility_mean_ (default: 1): mean parameter for the log-normal distribution used to generate the utility of the alternatives
+- _utility_sd_ (default: 1): standard-deviation parameter for the log-normal distribution used to generate the utility of the alternatives
+- _alpha_ (default: 1): energy consumption of an alternative is defined by alpha * (U ^ gamma) + beta where U is the utility of the alternative
+- _beta_ (default: 0): see alpha
+- _gamma_ (default: 1): see alpha
 
 #### Output
 
@@ -40,21 +54,38 @@ You can store the files in a different directory using the parameter _directory_
 - _individuals_who_moved.png_: graph plotting number of individuals who received incentives against iterations
 - _individuals_at_first_best.png_: graph plotting number of individuals at first best alternative (alternative with the most energy gains) against iterations
 
-#### Parameters
-
-You can change the value of the parameters used in the generating process:
-- _individuals_ (default: 1000): number of individuals generated
-- _mean_nb_alternatives_ (default: 10): average number of alternatives per individual
-- _use_poisson_ (default: True): if True, the number of alternatives is drawn from a Poisson distribution, else the number of alternatives is fixed to mean_nb_alternatives
-- _use_gumbel_ (default: False): if True, stochastic utility is generated from the Gumbel distribution, else the Logistic distribution is used
-- _random_utility_parameter_ (default: 10): parameter of the distribution used to generate stochastic utility (Gumbel or Logistic)
-- _utility_mean_ (default: 1): mean parameter for the log-normal distribution used to generate the utility of the alternatives
-- _utility_sd_ (default: 1): standard-deviation parameter for the log-normal distribution used to generate the utility of the alternatives
-- _alpha_ (default: 1): energy consumption of an alternative is defined by alpha * (U ^ gamma) + beta where U is the utility of the alternative
-- _beta_ (default: 0): see alpha
-- _gamma_ (default: 1): see alpha
-
 #### Example
 
 The following command run the algorithm with 500 individuals and 20 alternatives per individual on average and store the results in the directory _results/_:
 > full_simulation(directory='results', individuals=500, mean_nb_alternatives=20)
+
+### Commands _complexity_individuals()_ and _complexity_alternatives()_
+
+These commands run multiple simulations and plot graphs showing time complexity.
+With _complexity_individuals()_, the number of individuals varies across simulations and, with _complexity_alternatives()_, the average number of alternatives varies across simulations.
+
+#### Parameters
+
+Both commands have 3 mandatory parameters to specify the interval used for the varying number of individuals (for _complexity_individuals()_) or for the varying average number of alternatives (for _complexity_alternatives()_).
+- _start_: start value for the interval of number of individuals or average number of  alternatives
+- _stop_: end value for the interval of number of individuals or average number of alternatives
+- _step_: spacing between values in the interval
+
+The other parameters used in the simulations are set to their default value (the same value than with _full_simulation()_).
+You can change the value of these parameters using the same syntax (see example below).
+
+#### Output
+
+Both commands generate 3 graphs. The graphs are stored in the directory _complexity_individuals/_ or _complexity_alternatives/_.
+You can store the files in a different directory using the parameter _directory_ (see example below).
+- _generating_times.png_: graph showing time complexity for the time spent generating the data
+- _cleaning_times.png_: graph showing time complexity for the time spent cleaning the data (sorting and removing of Pareto-dominated alternatives)
+- _running_time.png_: graph showing time complexity for the time spent running the algorithm
+
+#### Example
+
+To run 90 simulations with the number of individuals varying from 100 to 990 (step of 10) and with the graphs stored in the directory _complexity_results/_, use:
+> complexity_individuals(100, 1000, 10, directory='complexity_results')
+
+To run 45 simulations with the average number of alternatives varying from 5 to 49 (step of 1) and with 500 individuals, use:
+> complexity_alternatives(5, 50, 1, individuals=500)
