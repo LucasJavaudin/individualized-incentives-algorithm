@@ -1625,7 +1625,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
         plt.close()
 
 
-def simulation(budget=np.infty, verbose=True, **kwargs):
+def _simulation(budget=np.infty, verbose=True, **kwargs):
     """Generate random data and run the algorithm.
 
     To specify the parameters for the generation process, use the same syntax as
@@ -1645,7 +1645,7 @@ def simulation(budget=np.infty, verbose=True, **kwargs):
     return results
 
 
-def full_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
+def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     """Generate all the files and graphs while generating random data and
     running the algorithm.
 
@@ -1667,14 +1667,14 @@ def full_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     # Store the starting time.
     init_time = time.time()
     if verbose:
-        print('Running a full simulation...')
+        print('Running simulation...')
     # Create the directory used to store the files.
     try:
         os.mkdir(directory)
     except FileExistsError:
         pass
     # Run the simulation.
-    results = simulation(budget=budget, verbose=verbose, **kwargs)
+    results = _simulation(budget=budget, verbose=verbose, **kwargs)
     # Generate the files and the graphs.
     results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
     results.data.output_characteristics(

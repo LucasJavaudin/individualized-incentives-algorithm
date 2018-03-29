@@ -15,11 +15,11 @@ How-To Run the Algorithm
 
 There is currently no GUI implemented to run the algorithm.
 You can run the algorithm by typing the following command line in a terminal.
-> python -i /path/to/file/incentives_algorithm.py
+> python -i /path/to/file/algorithm.py
 
 Then, you can type commands in the python interpreter.
 
-### Command _full_simulation()_
+### Command _run_simulation()_
 
 This command generate random data, sort the data, remove the Pareto-dominated alternatives and run the algorithm.
 
@@ -60,7 +60,7 @@ You can store the files in a different directory using the parameter _directory_
 #### Example
 
 The following command generate data with 500 individuals and 20 alternatives per individual on average, then run the algorithm with a budget of 10000 and store the results in the directory _results/_:
-> full_simulation(directory='results', budget=10000, individuals=500, mean_nb_alternatives=20)
+> run_simulation(directory='results', budget=10000, individuals=500, mean_nb_alternatives=20)
 
 ### Commands _complexity_individuals()_, _complexity_alternatives()_ and _complexity_budget()_
 
@@ -74,7 +74,7 @@ All these commands have 3 mandatory parameters to specify the interval used for 
 - _stop_: end value of the interval
 - _step_: spacing between values in the interval
 
-The other parameters used in the simulations are set to their default value (the same value than with _full_simulation()_).
+The other parameters used in the simulations are set to their default value (the same value than with _run_simulation()_).
 You can change the value of these parameters using the same syntax (see example below).
 
 Additionally, you can change the budget used to run the algorithm with the parameter _budget_.
