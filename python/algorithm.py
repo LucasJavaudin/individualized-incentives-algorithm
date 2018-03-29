@@ -814,6 +814,11 @@ class Data:
                 # variable.
                 results.overshot_jump = results.jumps_history[-1]
                 results.jumps_history = results.jumps_history[:-1]
+                # Remove the last value of incentives, energy gains and
+                # efficiency.
+                results.efficiencies_history = results.efficiencies_history[:-1]
+                results.incentives_history = results.incentives_history[:-1]
+                results.energy_gains_history = results.energy_gains_history[:-1]
             # Indicate that the algorithm was fully run.
             results.run_algorithm = True
         if verbose:
@@ -942,9 +947,11 @@ class AlgorithmResults:
         if self.overshot_jump is None:
             self.bound_size = 0
         else:
-            self.bound_size = self.data._energy_gains_amount(overshot_jump[0],
-                                                             overshot_jump[1],
-                                                             overshot_jump[2])
+            self.bound_size = self.data._energy_gains_amount(
+                                    self.overshot_jump[0],
+                                    self.overshot_jump[1],
+                                    self.overshot_jump[2]
+                                )
         self.max_bound = self.total_energy_gains
         self.min_bound = self.max_bound - self.bound_size
         # Compute the amount of expenses at each iteration.
@@ -1052,7 +1059,8 @@ class AlgorithmResults:
         output_file.write(('\nActual budget in percentage of maximum budget '
                           + 'necessary:').ljust(size) 
                           + "{:,.2%}".format(self.percent_max_expenses))
-        output_file.write('\nMaximum energy gains:'.ljust(size) )
+        output_file.write('\nMaximum energy gains:'.ljust(size) 
+                          + "{:,.4f}".format(self.max_total_energy_gains))
         output_file.write(('\nActual energy gains in percentage of maximum '
                           + 'energy gains:').ljust(size) 
                           + "{:,.2%}".format(self.percent_total_energy_gains))
@@ -1645,6 +1653,91 @@ def _simulation(budget=np.infty, verbose=True, **kwargs):
     return results
 
 
+def _run_algorithm(simulation=None, filename=None, budget=np.infty,
+        directory='files', delimiter=',', comment='#', verbose=True, **kwargs):
+    """Run the algorithm and generate files and graphs.
+
+    The algorithm can be run with generated data or with imported data.
+
+    :simulation: boolean indicated whether the data must be generated or 
+    imported
+    :filename: string with the name of the file containing the data
+    :budget: budget used to run the algorithm, by default budget is infinite
+    :directory: directory where the files are stored, must be a string, default
+    is 'files'
+    :delimiter: the character used to separated the utility and the energy
+    consumption of the alternatives, default is comma
+    :comment: line starting with this string are not read, should be a
+    string, default is #
+    :verbose: if True, display progress bars and some information
+
+    """
+    # Store the starting time.
+    init_time = time.time()
+    # Create the directory used to store the files.
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+    if simulation:
+        # Run the simulation.
+        results = _simulation(budget=budget, verbose=verbose, **kwargs)
+    else:
+        # Import the data.
+        data = Data()
+        data.read(filename, delimiter=delimiter, comment=comment, verbose=verbose)
+        # Run the algorithm.
+        results = data.run_algorithm(budget=budget, verbose=verbose)
+    # Generate the files and the graphs.
+    results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
+    results.data.output_characteristics(
+            filename=directory+'/data_characteristics.txt',
+            verbose=verbose
+            )
+    results.output_results(
+            filename=directory+'/results.txt', 
+            verbose=verbose
+            )
+    results.output_characteristics(
+            filename=directory+'/results_characteristics.txt', 
+            verbose=verbose
+            )
+    results.plot_efficiency_curve(
+            filename=directory+'/efficiency_curve.png',
+            verbose=verbose
+            )
+    results.plot_efficiency_evolution(
+            filename=directory+'/efficiency_evolution.png',
+            verbose=verbose
+            )
+    results.plot_incentives_evolution(
+            filename=directory+'/incentives_evolution.png',
+            verbose=verbose
+            )
+    results.plot_energy_gains_evolution(
+            filename=directory+'/energy_gains_evolution.png',
+            verbose=verbose
+            )
+    results.plot_bounds(
+            filename=directory+'/bounds.png', 
+            verbose=verbose
+            )
+    results.plot_individuals_who_moved(
+            filename=directory+'/individuals_who_moved.png',
+            verbose=verbose
+            )
+    results.plot_individuals_at_first_best(
+            filename=directory+'/individuals_at_first_best.png',
+            verbose=verbose
+            )
+    # Store the total time to run the simulation.
+    total_time = time.time() - init_time
+    if verbose:
+        print('Finished! (Elapsed Time: ' 
+              + str(round(total_time, 2)) 
+              + 's)')
+
+
 def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     """Create files and graphs while generating random data and running the 
     algorithm.
@@ -1663,68 +1756,12 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     :verbose: if True, display progress bars and some information
 
     """
-    # Store the starting time.
-    init_time = time.time()
-    if verbose:
-        print('Running simulation...')
-    # Create the directory used to store the files.
-    try:
-        os.mkdir(directory)
-    except FileExistsError:
-        pass
-    # Run the simulation.
-    results = _simulation(budget=budget, verbose=verbose, **kwargs)
-    # Generate the files and the graphs.
-    results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
-    results.data.output_characteristics(
-            filename=directory+'/data_characteristics.txt',
-            verbose=verbose
-            )
-    results.output_results(
-            filename=directory+'/results.txt', 
-            verbose=verbose
-            )
-    results.output_characteristics(
-            filename=directory+'/results_characteristics.txt', 
-            verbose=verbose
-            )
-    results.plot_efficiency_curve(
-            filename=directory+'/efficiency_curve.png',
-            verbose=verbose
-            )
-    results.plot_efficiency_evolution(
-            filename=directory+'/efficiency_evolution.png',
-            verbose=verbose
-            )
-    results.plot_incentives_evolution(
-            filename=directory+'/incentives_evolution.png',
-            verbose=verbose
-            )
-    results.plot_energy_gains_evolution(
-            filename=directory+'/energy_gains_evolution.png',
-            verbose=verbose
-            )
-    results.plot_bounds(
-            filename=directory+'/bounds.png', 
-            verbose=verbose
-            )
-    results.plot_individuals_who_moved(
-            filename=directory+'/individuals_who_moved.png',
-            verbose=verbose
-            )
-    results.plot_individuals_at_first_best(
-            filename=directory+'/individuals_at_first_best.png',
-            verbose=verbose
-            )
-    # Store the total time to run the simulation.
-    total_time = time.time() - init_time
-    if verbose:
-        print('Simulation successfully run in ' 
-              + str(round(total_time, 2)) 
-              + 's.')
+    _run_algorithm(simulation=True, budget=budget, directory=directory, verbose=verbose,
+            **kwargs)
 
 
-def run_from_file(filename, budget=np.infty, directory='files', verbose=True):
+def run_from_file(filename, budget=np.infty, directory='files', delimiter=',', 
+        comment='#', verbose=True):
     """Read data from a file and run the algorithm.
 
     The generated files are the data, data characteristics, the results and results
@@ -1737,71 +1774,15 @@ def run_from_file(filename, budget=np.infty, directory='files', verbose=True):
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: directory where the files are stored, must be a string, default
     is 'files'
+    :delimiter: the character used to separated the utility and the energy
+    consumption of the alternatives, default is comma
+    :comment: line starting with this string are not read, should be a
+    string, default is #
     :verbose: if True, display progress bars and some information
 
     """
-    # Store the starting time.
-    init_time = time.time()
-    if verbose:
-        print('Running simulation...')
-    # Create the directory used to store the files.
-    try:
-        os.mkdir(directory)
-    except FileExistsError:
-        pass
-    # Import the data.
-    data = Data()
-    data.read(filename, verbose=verbose)
-    # Run the algorithm.
-    results = data.run_algorithm(budget=budget, verbose=verbose)
-    # Generate the files and the graphs.
-    results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
-    results.data.output_characteristics(
-            filename=directory+'/data_characteristics.txt',
-            verbose=verbose
-            )
-    results.output_results(
-            filename=directory+'/results.txt', 
-            verbose=verbose
-            )
-    results.output_characteristics(
-            filename=directory+'/results_characteristics.txt', 
-            verbose=verbose
-            )
-    results.plot_efficiency_curve(
-            filename=directory+'/efficiency_curve.png',
-            verbose=verbose
-            )
-    results.plot_efficiency_evolution(
-            filename=directory+'/efficiency_evolution.png',
-            verbose=verbose
-            )
-    results.plot_incentives_evolution(
-            filename=directory+'/incentives_evolution.png',
-            verbose=verbose
-            )
-    results.plot_energy_gains_evolution(
-            filename=directory+'/energy_gains_evolution.png',
-            verbose=verbose
-            )
-    results.plot_bounds(
-            filename=directory+'/bounds.png', 
-            verbose=verbose
-            )
-    results.plot_individuals_who_moved(
-            filename=directory+'/individuals_who_moved.png',
-            verbose=verbose
-            )
-    results.plot_individuals_at_first_best(
-            filename=directory+'/individuals_at_first_best.png',
-            verbose=verbose
-            )
-    # Store the total time to run the simulation.
-    total_time = time.time() - init_time
-    if verbose:
-        print('Algorithm successfully run in ' 
-              + str(round(total_time, 2)) 
-              + 's.')
+    _run_algorithm(simulation=False, filename=filename, budget=budget, directory=directory,
+            delimiter=delimiter, comment=comment, verbose=verbose)
 
 
 def _complexity(varying_parameter, start, stop, step, budget=np.infty, 
@@ -1869,7 +1850,7 @@ def _complexity(varying_parameter, start, stop, step, budget=np.infty,
     if varying_parameter == 'individuals':
         string = 'Number of Individuals'
     elif varying_parameter == 'alternatives':
-        string = 'Mean Alternatives'
+        string = 'Average Number of Alternatives'
     elif varying_parameter == 'budget':
         string = 'Budget'
     _plot_scatter(
