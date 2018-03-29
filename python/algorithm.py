@@ -732,20 +732,11 @@ class Data:
         results = AlgorithmResults(self, budget)
         # Compute the amount of expenses needed to reach the state where all
         # individuals are at their last alternative.
-        init_state = np.zeros(self.individuals, dtype=int)
-        last_state = np.array(self.alternatives_per_individual) - 1
-        init_utility = self._total_utility(init_state)
-        last_utility = self._total_utility(last_state)
-        max_expenses = init_utility - last_utility
         # Return the last state if the budget is enough to reach it.
-        if (not force) and (budget >= max_expenses):
-            results.optimal_state = last_state
-            results.expenses = max_expenses
+        if (not force) and (budget >= results.max_expenses):
+            results.optimal_state = results.last_state
+            results.expenses = results.max_expenses
         else:
-            # Compute the maximum total energy gains reachable.
-            init_energy = self._total_energy(init_state)
-            last_energy = self._total_energy(last_state)
-            max_total_energy_gains = init_energy - last_energy
             # Compute the efficiency and the resulting alternative of the best 
             # jump of all individuals.
             best_efficiencies, best_alternatives = \
@@ -844,6 +835,16 @@ class AlgorithmResults:
         # Compute the initial state and the first best state.
         self.init_state = np.zeros(self.data.individuals, dtype=int)
         self.last_state = np.array(self.data.alternatives_per_individual) - 1
+        # Compute initial utility, first best utility and max
+        # budget necessary. 
+        self.init_utility = self.data._total_utility(self.init_state)
+        self.last_utility = self.data._total_utility(self.last_state)
+        self.max_expenses = self.init_utility - self.last_utility
+        self.percent_max_expenses = self.budget / self.max_expenses
+        # Same for energy.
+        self.init_energy = self.data._total_energy(self.init_state)
+        self.last_energy = self.data._total_energy(self.last_state)
+        self.max_total_energy_gains = self.init_energy - self.last_energy
         # The variable optimal_state is a numpy array with the alternative
         # chosen by all the individuals at the optimal state, the array is 
         # initialized with all individuals being at their first alternative.
@@ -905,21 +906,13 @@ class AlgorithmResults:
             self.data._incentives_amount(i, 0, self.optimal_state[i]) 
             for i in range(self.data.individuals)
         ]
+        # Compute optimal utility and optimal energy gains.
+        self.optimal_utility = self.init_utility - self.expenses
+        self.optimal_energy = self.init_energy - self.total_energy_gains
         # Compute the remaining budget and the percentage of budget used.
         self.budget_remaining = self.budget - self.expenses
         self.percent_budget = self.expenses / self.budget
-        # Compute initial utility, optimal utility, first best utility and max
-        # budget necessary. 
-        self.init_utility = self.data._total_utility(self.init_state)
-        self.optimal_utility = self.init_utility - self.expenses
-        self.last_utility = self.data._total_utility(self.last_state)
-        self.max_expenses = self.init_utility - self.last_utility
-        self.percent_max_expenses = self.budget / self.max_expenses
-        # Same for energy.
-        self.init_energy = self.data._total_energy(self.init_state)
-        self.optimal_energy = self.init_energy - self.total_energy_gains
-        self.last_energy = self.data._total_energy(self.last_state)
-        self.max_total_energy_gains = self.init_energy - self.last_energy
+        # Compute the energy gains as percentage of total energy gains possible.
         self.percent_total_energy_gains = \
             self.total_energy_gains / self.max_total_energy_gains
         # Compute efficiency of first and last jump and total efficiency.
