@@ -19,6 +19,57 @@ You can run the algorithm by typing the following command line in a terminal.
 
 Then, you can type commands in the python interpreter.
 
+### Command _run_from_file()_
+
+This command import data from a file and run the algorithm.
+
+#### Parameters
+
+You must specify the name of the file containing the data as a string (e.g. 'data.txt').
+Python look for the file in the current working directory.
+Alternatively, you can specify the complete path to the file.
+
+Optionally, you can specify the budget used to run the algorithm with the parameter _budget_.
+By default, the budget is infinite.
+
+#### Input file
+
+The file containing the data must have two lines for each individual.
+The two first lines describe the alternatives of the first individual, the two subsequent lines describe the alternatives of the second individual, etc.
+
+The first line of each individual contains the utility of the alternatives and the second line contains the energy consumption of the alternatives.
+The two lines must contain the same number of values.
+The values are separated by a comma (you can change the delimiter character with the parameter _delimiter_).
+
+Lines starting with '#' are not read by Python (you can change the comment character with the parameter _comment_).
+
+The file _sample_data.txt_ in the directory _python_ is an example of input file.
+
+#### Output
+
+If no error occurred, 4 text files and 6 graphs are generated and saved in directory _files/_.
+If you run the command a second time, the previous files are deleted.
+You can store the files in a different directory using the parameter _directory_ (see example below).
+- _data.txt_: file with the generated data (utility and energy gains for all alternatives)
+- _data_characteristics.txt: file with some characteristics on the data (number of individual, total energy gains possible, etc.)
+- _results.txt: file with the results of the algorithm (final choice and amount of incentives for all individuals)
+- _results_characteristics.txt_: file with some characteristics on the results (expenses, energy gains, number of iterations, etc.)
+- _efficiency_curve.png_: graph plotting total energy gains against expenses
+- _efficiency_evolution.png_: graph plotting efficiency of the jumps against iterations
+- _incentives_evolution.png_: graph plotting amount of incentives of the jumps against iterations
+- _energy_gains.png_: graph plotting energy gains of the jumps against iterations
+- _bounds.png: graph with lower and upper bounds for total energy gains
+- _individuals_who_moved.png_: graph plotting number of individuals who received incentives against iterations
+- _individuals_at_first_best.png_: graph plotting number of individuals at first best alternative (alternative with the most energy gains) against iterations
+
+#### Example
+
+The following command imports data from the file _sample_data.txt_, runs the algorithm with a budget of 10000 and stores the results in the directory _/results_.
+> run_from_file('sample_data.txt', budget=10000, directory='results')
+
+The following command imports data from the file _input.txt_ with semi-colons as delimiter and with '*' as comment character, and then run the algorithm.
+> run_from_file('input.txt', delimiter=';', comment='*')
+
 ### Command _run_simulation()_
 
 This command generate random data, sort the data, remove the Pareto-dominated alternatives and run the algorithm.
@@ -59,7 +110,7 @@ You can store the files in a different directory using the parameter _directory_
 
 #### Example
 
-The following command generate data with 500 individuals and 20 alternatives per individual on average, then run the algorithm with a budget of 10000 and store the results in the directory _results/_:
+The following command generates data with 500 individuals and 20 alternatives per individual on average, then runs the algorithm with a budget of 10000 and stores the results in the directory _results/_:
 > run_simulation(directory='results', budget=10000, individuals=500, mean_nb_alternatives=20)
 
 ### Commands _complexity_individuals()_, _complexity_alternatives()_ and _complexity_budget()_
@@ -89,7 +140,7 @@ You can store the files in a different directory using the parameter _directory_
 - _cleaning_times.png_: graph showing time complexity for the time spent cleaning the data (sorting and removing of Pareto-dominated alternatives)
 - _running_time.png_: graph showing time complexity for the time spent running the algorithm
 
-#### Example
+#### Examples
 
 To run 90 simulations with the number of individuals varying from 100 to 990 (step of 10) and with the graphs stored in the directory _complexity_results/_, use:
 > complexity_individuals(100, 1000, 10, directory='complexity_results')
