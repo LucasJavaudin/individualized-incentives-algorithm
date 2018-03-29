@@ -37,6 +37,9 @@ You can change the value of the parameters used in the generating process:
 - _beta_ (default: 0): see alpha
 - _gamma_ (default: 1): see alpha
 
+You can also change the budget used to run the algorithm with the parameter _budget_.
+By default, the budget is infinite (the algorithm run until all individuals are at the alternative with the most energy gains).
+
 #### Output
 
 If no error occurred, 4 text files and 6 graphs are generated and saved in directory _files/_.
@@ -56,27 +59,31 @@ You can store the files in a different directory using the parameter _directory_
 
 #### Example
 
-The following command run the algorithm with 500 individuals and 20 alternatives per individual on average and store the results in the directory _results/_:
-> full_simulation(directory='results', individuals=500, mean_nb_alternatives=20)
+The following command generate data with 500 individuals and 20 alternatives per individual on average, then run the algorithm with a budget of 10000 and store the results in the directory _results/_:
+> full_simulation(directory='results', budget=10000, individuals=500, mean_nb_alternatives=20)
 
-### Commands _complexity_individuals()_ and _complexity_alternatives()_
+### Commands _complexity_individuals()_, _complexity_alternatives()_ and _complexity_budget()_
 
 These commands run multiple simulations and plot graphs showing time complexity.
-With _complexity_individuals()_, the number of individuals varies across simulations and, with _complexity_alternatives()_, the average number of alternatives varies across simulations.
+With _complexity_individuals()_, the number of individuals varies across simulations; with _complexity_alternatives()_, the average number of alternatives varies across simulations; with _complexity_budget()_, the budget varies across simulations.
 
 #### Parameters
 
-Both commands have 3 mandatory parameters to specify the interval used for the varying number of individuals (for _complexity_individuals()_) or for the varying average number of alternatives (for _complexity_alternatives()_).
-- _start_: start value for the interval of number of individuals or average number of  alternatives
-- _stop_: end value for the interval of number of individuals or average number of alternatives
+All these commands have 3 mandatory parameters to specify the interval used for the varying number of individuals (for _complexity_individuals()_), for the varying average number of alternatives (for _complexity_alternatives()_) or for the varying budget (for _complexity_budget()_).
+- _start_: start value of the interval
+- _stop_: end value of the interval
 - _step_: spacing between values in the interval
 
 The other parameters used in the simulations are set to their default value (the same value than with _full_simulation()_).
 You can change the value of these parameters using the same syntax (see example below).
 
+Additionally, you can change the budget used to run the algorithm with the parameter _budget_.
+By default, the budget is infinite.
+Note that this parameter does not work with _complexity_budget()_.
+
 #### Output
 
-Both commands generate 3 graphs. The graphs are stored in the directory _complexity_individuals/_ or _complexity_alternatives/_.
+All these commands generate 3 graphs. By defaults, the graphs are stored in the directory _complexity_individuals/_, _complexity_alternatives/_ or _complexity_budget/_.
 You can store the files in a different directory using the parameter _directory_ (see example below).
 - _generating_times.png_: graph showing time complexity for the time spent generating the data
 - _cleaning_times.png_: graph showing time complexity for the time spent cleaning the data (sorting and removing of Pareto-dominated alternatives)
@@ -87,5 +94,5 @@ You can store the files in a different directory using the parameter _directory_
 To run 90 simulations with the number of individuals varying from 100 to 990 (step of 10) and with the graphs stored in the directory _complexity_results/_, use:
 > complexity_individuals(100, 1000, 10, directory='complexity_results')
 
-To run 45 simulations with the average number of alternatives varying from 5 to 49 (step of 1) and with 500 individuals, use:
-> complexity_alternatives(5, 50, 1, individuals=500)
+To run 45 simulations with the average number of alternatives varying from 5 to 49 (step of 1), with 500 individuals and with a budget of 10000, use:
+> complexity_alternatives(5, 50, 1, individuals=500, budget=10000)
