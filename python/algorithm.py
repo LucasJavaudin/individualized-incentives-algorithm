@@ -33,8 +33,10 @@ class Data:
     The attribute generated_data is True if the data are generated.
     The attribute is_sorted is True if the data are sorted by utility and then
     by energy consumption.
-    The attribute is_cleaned is True if the Pareto-dominated alternatives are 
-    removed from the data.
+    The attribute pareto_dominated_removed is True if the Pareto-dominated 
+    alternatives are removed from the data.
+    The attribute efficiency_dominated_removed is True if the
+    efficiency-dominated alterantives are removed from the data.
     """
 
     def __init__(self):
@@ -51,11 +53,14 @@ class Data:
         self.total_alternatives = 0
         self.generated_data = False
         self.is_sorted = False
-        self.is_cleaned = False
+        self.pareto_dominated_removed = False
+        self.efficiency_dominated_removed = False
         self.read_time = None
         self.generating_time = None
         self.output_data_time = None
         self.output_characteristics_time = None
+        self.sorting_time = None
+        self.pareto_removing_time = None
 
     def _append(self, narray):
         """Append the specified numpy array to the Data object.
@@ -79,7 +84,7 @@ class Data:
         self.total_alternatives += n
         # The data are a priori no longer sorted and cleaned.
         self.is_sorted = False
-        self.is_cleaned = False
+        self.pareto_dominated_removed = False
 
     def read(self, filename, delimiter=',', comment='#', verbose=True):
         """Read data from an input file.
@@ -388,18 +393,18 @@ class Data:
             output_file.write('\nThe data are sorted')
         else:
             output_file.write('\nThe data are not sorted')
-        # Indicate if the data are cleaned.
-        if self.is_cleaned:
-            output_file.write('\nThe data are cleaned')
+        # Indicate if the Pareto-dominated alternatives are removed.
+        if self.pareto_dominated_removed:
             output_file.write('\n' 
                               + str(self.pareto_removed) 
-                              + ' Pareto-dominated alternatives were removed.')
+                              + ' Pareto-dominated alternatives were removed')
         else:
-            output_file.write('\nThe data are not cleaned')
+            output_file.write('\nThe Pareto-dominated alternatives are not'
+                              + ' removed')
         # Store the time spent to output characteristics.
         self.output_characteristics_time = time.time() - init_time
 
-    def clean(self, verbose=True):
+    def remove_pareto_dominated(self, verbose=True):
         """Remove the Pareto-dominated alternatives.
 
         :verbose: if True, a progress bar and some information are displayed during
@@ -413,7 +418,7 @@ class Data:
         init_time = time.time()
         if verbose:
             bar = _known_custom_bar(self.individuals, 
-                                    'Cleaning the data')
+                                    'Cleaning data (Pareto)')
         # Variable used to count the number of removed alternatives.
         nb_removed = 0
         # For each individual remove the Pareto-dominated alternatives.
@@ -448,10 +453,10 @@ class Data:
                   + str(self.pareto_removed) 
                   + ' Pareto-dominated alternatives.'
                  )
-        # The data are now cleaned.
-        self.is_cleaned = True
-        # Store the time spent to clean data.
-        self.cleaning_time = time.time() - init_time
+        # The Pareto-dominated alternatives are now removed.
+        self.pareto_dominated_removed = True
+        # Store the time spent to remove the Pareto-dominated alternatives.
+        self.pareto_removing_time = time.time() - init_time
 
     def sort(self, verbose=True):
         """Sort the data by utility, then by energy consumption.
@@ -464,7 +469,7 @@ class Data:
         init_time = time.time()
         if verbose:
             bar = _known_custom_bar(self.individuals,
-                                    'Sorting the data')
+                                    'Sorting data')
         for indiv, line in enumerate(self.list):
             # The numpy array for each individual is sorted by utility and then
             # by energy consumption.
@@ -714,20 +719,21 @@ class Data:
         :returns: an AlgorithmResults object
 
         """
-        # Running the algorithm only work if the Data object is cleaned.
-        if not self.is_cleaned:
-            self.clean(verbose=verbose)
+        # Running the algorithm only work if the Pareto-dominated alternatives
+        # are removed.
+        if not self.pareto_dominated_removed:
+            self.remove_pareto_dominated(verbose=verbose)
         # Store the starting time.
         init_time = time.time()
         if verbose:
             if budget == np.infty:
                 bar = _known_custom_bar(
                     self.total_alternatives - self.individuals,
-                    'Running the algorithm'
+                    'Running algorithm'
                 )
             else:
                 bar = _known_custom_bar(budget, 
-                                        'Running the algorithm')
+                                        'Running algorithm')
         # Create an AlgorithmResults object where the variables are stored.
         results = AlgorithmResults(self, budget)
         # Compute the amount of expenses needed to reach the state where all
@@ -1117,6 +1123,13 @@ class AlgorithmResults:
         if not self.data.generating_time is None:
             output_file.write('\nTime to generate the data (s):'.ljust(size)
                               + "{:,.4f}".format(self.data.generating_time))
+        if not self.data.sorting_time is None:
+            output_file.write('\nTime to sort the data (s):'.ljust(size)
+                              + "{:,.4f}".format(self.data.sorting_time))
+        if not self.data.pareto_removing_time is None:
+            output_file.write(('\nTime to remove Pareto-dominated'
+                               + ' alternatives (s):').ljust(size)
+                              + "{:,.4f}".format(self.data.pareto_removing_time))
         if not self.data.output_data_time is None:
             output_file.write('\nTime to output the data (s):'.ljust(size)
                               + "{:,.4f}".format(self.data.output_data_time))
@@ -1811,7 +1824,7 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
         bar = _known_custom_bar(len(X), 'Running simulations')
     # Generate empty lists to store the computing times.
     generating_times = []
-    cleaning_times = []
+    pareto_removing_times = []
     running_times = []
     # Run a simulation for each value in the interval and store relevant
     # results.
@@ -1829,10 +1842,10 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
             data.generate(verbose=False, **kwargs)
         time1 = time.time()
         generating_times.append(time1 - time0)
-        # Clean the data.
-        data.clean(verbose=False)
+        # Remove the Pareto dominated alternatives.
+        data.remove_pareto_dominated(verbose=False)
         time2 = time.time()
-        cleaning_times.append(time2 - time1)
+        pareto_removing_times.append(time2 - time1)
         # Run the algorithm.
         if varying_parameter == 'budget':
             data.run_algorithm(budget=x, verbose=False)
@@ -1845,23 +1858,24 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
     _plot_scatter(
             X, 
             generating_times, 
-            'Time Complexity with the '+string+ '(Generating Time)', 
+            'Time Complexity with the '+string+ '\n(Generating Time)', 
             string, 
             'Generating Time',
             filename=directory+'/generating_time.png'
             )
     _plot_scatter(
             X, 
-            cleaning_times, 
-            'Time Complexity with the '+string + '(Cleaning Time)',
+            pareto_removing_times, 
+            'Time Complexity with the '+string 
+            + '\n(Time to Remove Pareto-Dominated Alternatives)',
             string, 
-            'Cleaning Time',
-            filename=directory+'/cleaning_times.png'
+            'Time to Remove Pareto-Dominated Alternatives',
+            filename=directory+'/removing_pareto_dominated_times.png'
             )
     _plot_scatter(
             X, 
             running_times, 
-            'Time Complexity with the '+string + '(Running Time)',
+            'Time Complexity with the '+string + '\n(Running Time)',
             string, 
             'Running Time',
             filename=directory+'/running_time.png'
