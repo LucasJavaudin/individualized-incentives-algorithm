@@ -81,7 +81,7 @@ class Data:
         self.is_sorted = False
         self.is_cleaned = False
 
-    def read(self, filename, delimiter=',', comments='#', verbose=True):
+    def read(self, filename, delimiter=',', comment='#', verbose=True):
         """Read data from an input file.
 
         Lines can be commented with the specified character.
@@ -94,7 +94,7 @@ class Data:
         :filename: string with the name of the file containing the data
         :delimiter: the character used to separated the utility and the energy
         consumption of the alternatives, default is comma
-        :comments: line starting with this string are not read, should be a
+        :comment: line starting with this string are not read, should be a
         string, default is #
         :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
@@ -118,8 +118,8 @@ class Data:
         # when the line number is even (energy consumption).
         odd = True
         for line in input_file:
-            # The line starting by comments are not read.
-            if not line.startswith(comments):
+            # The line starting by comment are not read.
+            if not line.startswith(comment):
                 # For odd lines, the values are stored in the numpy array utility.
                 if odd:
                     utility = np.fromstring(line, sep=delimiter)
@@ -245,7 +245,7 @@ class Data:
         # Store the time spent to generate data.
         self.generating_time = time.time() - init_time
 
-    def output_data(self, filename, delimiter=',', comments='#', verbose=True):
+    def output_data(self, filename, delimiter=',', comment='#', verbose=True):
         """Write the data on a file.
 
         The output file can be read with the function read.
@@ -253,7 +253,7 @@ class Data:
         :filename: string with the name of the file where the data are written
         :delimiter: the character used to separated the utility and the energy
         consumption of the alternatives, default is comma
-        :comments: string used for the comments in the output file, should be a
+        :comment: string used for the comments in the output file, should be a
         string, default is #
         :verbose: if True, a progress bar and some information are displayed during
         the process, default is True
@@ -276,7 +276,7 @@ class Data:
         for i in range(self.individuals):
             line = np.transpose(self.list[i])
             np.savetxt(output_file, line, fmt = '%-7.4f', header = 'Individual '
-                       + str(i+1), delimiter = ',', comments=comments)
+                       + str(i+1), delimiter = ',', comments=comment)
             if verbose:
                 # Update the progress bar.
                 bar.update(i)
