@@ -111,7 +111,7 @@ You can store the files in a different directory using the parameter _directory_
 #### Example
 
 The following command generates data with 500 individuals and 20 alternatives per individual on average, then runs the algorithm with a budget of 10000 and stores the results in the directory _results/_:
-> run_simulation(directory='results', budget=10000, individuals=500, mean_nb_alternatives=20)
+> run_simulation(budget=10000, individuals=500, mean_nb_alternatives=20, directory='results')
 
 ### Commands _complexity_individuals()_, _complexity_alternatives()_ and _complexity_budget()_
 
