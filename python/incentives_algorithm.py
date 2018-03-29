@@ -1625,12 +1625,13 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
         plt.close()
 
 
-def simulation(verbose=True, **kwargs):
-    """Generate random data and run the algorithm with an infinite budget.
+def simulation(budget=np.infty, verbose=True, **kwargs):
+    """Generate random data and run the algorithm.
 
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
 
+    :budget: budget used to run the algorithm, by default budget is infinite
     :verbose: if True, display progress bars and some information
     :returns: an AlgorithmResults object with the results of the algorithm run
 
@@ -1640,11 +1641,11 @@ def simulation(verbose=True, **kwargs):
     # Generate random data.
     data.generate(verbose=verbose, **kwargs)
     # Run the algorithm.
-    results = data.run_algorithm(verbose=verbose)
+    results = data.run_algorithm(budget=budget, verbose=verbose)
     return results
 
 
-def full_simulation(directory='files', verbose=True, **kwargs):
+def full_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     """Generate all the files and graphs while generating random data and
     running the algorithm.
 
@@ -1657,6 +1658,7 @@ def full_simulation(directory='files', verbose=True, **kwargs):
     individuals at first best.
     All the files and graphs generated are stored in the same directory.
 
+    :budget: budget used to run the algorithm, by default budget is infinite
     :directory: directory where the files are stored, must be a string, default
     is 'files'
     :verbose: if True, display progress bars and some information
@@ -1672,7 +1674,7 @@ def full_simulation(directory='files', verbose=True, **kwargs):
     except FileExistsError:
         pass
     # Run the simulation.
-    results = simulation(verbose=verbose, **kwargs)
+    results = simulation(budget=budget, verbose=verbose, **kwargs)
     # Generate the files and the graphs.
     results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
     results.data.output_characteristics(
@@ -1720,144 +1722,165 @@ def full_simulation(directory='files', verbose=True, **kwargs):
     if verbose:
         print('Simulation successfully run in ' 
               + str(round(total_time, 2)) 
-              + 's')
+              + 's.')
 
 
-def complexity_individuals(start, stop, step, verbose=True, 
-        **kwargs):
+def _complexity(varying_parameter, start, stop, step, budget=np.infty, 
+        directory='complexity', verbose=True, **kwargs):
+    """Run multiple simulations with a parameter varying and compute time
+    complexity of the algorithm.
+
+    :varying_parameter: string specifying the parameter which varies across
+    simulations, possible values are 'individuals', 'alternatives' and 'budget'
+    :start: start value for the interval of number of individuals
+    :stop: end value for the interval of number of individuals, this value is
+    not include in the interval
+    :step: spacing between values in the interval
+    :budget: budget used to run the algorithm, by default budget is infinite
+    :directory: string specifying the directory where the files are stored
+    :verbose: if True, a progress bar and some information are displayed during
+
+    """
+    # Check that varying_parameter is well specified.
+    assert varying_parameter in ['individuals', 'alternatives', 'budget'], \
+        'The varying parameter is not well specified'
+    # Create the directory used to store the files.
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+    # Compute the interval of values for the number of individuals.
+    X = np.arange(start, stop, step, dtype=int)
+    if verbose:
+        # Print a progress bar of duration the number of simulations.
+        bar = _known_custom_bar(len(X), 'Running simulations')
+    # Generate empty lists to store the computing times.
+    generating_times = []
+    cleaning_times = []
+    running_times = []
+    # Run a simulation for each value in the interval and store relevant
+    # results.
+    for i, x in enumerate(X):
+        if verbose:
+            bar.update(i)
+        data = Data()
+        time0 = time.time()
+        # Generate the data.
+        if varying_parameter == 'individuals':
+            data.generate(individuals=x, verbose=False, **kwargs)
+        elif varying_parameter == 'alternatives':
+            data.generate(mean_nb_alternatives=x, verbose=False, **kwargs)
+        elif varying_parameter == 'budget':
+            data.generate(verbose=False, **kwargs)
+        time1 = time.time()
+        generating_times.append(time1 - time0)
+        # Clean the data.
+        data.clean(verbose=False)
+        time2 = time.time()
+        cleaning_times.append(time2 - time1)
+        # Run the algorithm.
+        if varying_parameter == 'budget':
+            data.run_algorithm(budget=x, verbose=False)
+        else:
+            data.run_algorithm(budget=budget, verbose=False)
+        time3 = time.time()
+        running_times.append(time3 - time2)
+    bar.finish()
+    # Plot graphs showing time complexity.
+    if varying_parameter == 'individuals':
+        string = 'Number of Individuals'
+    elif varying_parameter == 'alternatives':
+        string = 'Mean Alternatives'
+    elif varying_parameter == 'budget':
+        string = 'Budget'
+    _plot_scatter(
+            X, 
+            generating_times, 
+            'Time Complexity with the '+string+ '(Generating Time)', 
+            string, 
+            'Generating Time',
+            filename=directory+'/generating_time.png'
+            )
+    _plot_scatter(
+            X, 
+            cleaning_times, 
+            'Time Complexity with the '+string + '(Cleaning Time)',
+            string, 
+            'Cleaning Time',
+            filename=directory+'/cleaning_times.png'
+            )
+    _plot_scatter(
+            X, 
+            running_times, 
+            'Time Complexity with the '+string + '(Running Time)',
+            string, 
+            'Running Time',
+            filename=directory+'/running_time.png'
+            )
+    if verbose:
+        print('Successfully run ' + str(len(X)) + ' simulations.')
+
+
+def complexity_individuals(start, stop, step, budget=np.infty,
+        directory='complexity_individuals', verbose=True, **kwargs):
     """Run multiple simulations with a varying number of individuals and compute
     time complexity of the algorithm.
 
-    The simulation are run with an infinite budget, by default.
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
-    All the graphs generated are stored in the directory complexity_individuals/.
 
     :start: start value for the interval of number of individuals
     :stop: end value for the interval of number of individuals, this value is
     not include in the interval
     :step: spacing between values in the interval
+    :budget: budget used to run the algorithm, by default budget is infinite
+    :directory: string specifying the directory where the files are stored
     :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
-    # Create the directory complexity_individuals/.
-    try:
-        os.mkdir('complexity_individuals')
-    except FileExistsError:
-        pass
-    # Compute the interval of values for the number of individuals.
-    X = np.arange(start, stop, step, dtype=int)
-    if verbose:
-        # Print a progress bar of duration the number of simulations.
-        bar = _known_custom_bar(len(X), 'Running simulations')
-    # Generate empty lists to store the computing times.
-    generating_times = []
-    cleaning_times = []
-    running_times = []
-    # Run a simulation for each value in the interval and store relevant
-    # results.
-    for i, x in enumerate(X):
-        if verbose:
-            bar.update(i)
-        data = Data()
-        time0 = time.time()
-        # Generate the data.
-        data.generate(individuals=x, verbose=False, **kwargs)
-        time1 = time.time()
-        generating_times.append(time1 - time0)
-        # Clean the data.
-        data.clean(verbose=False)
-        time2 = time.time()
-        cleaning_times.append(time2 - time1)
-        # Run the algorithm.
-        data.run_algorithm(verbose=False)
-        time3 = time.time()
-        running_times.append(time3 - time2)
-    bar.finish()
-    # Plot graphs showing time complexity.
-    _plot_scatter(X, generating_times, 
-            'Time Complexity with the Number of Individuals ' 
-            + '(Generating Time)', 
-            'Number of individuals', 'Generating time',
-            filename='complexity_individuals/generating_time.png')
-    _plot_scatter(X, cleaning_times, 
-            'Time Complexity with the Number of Individuals '
-            + '(Cleaning Time)',
-            'Number of individuals', 'Cleaning time',
-            filename='complexity_individuals/cleaning_times.png')
-    _plot_scatter(X, running_times, 
-            'Time Complexity with the Number of Individuals '
-            + '(Running Time)',
-            'Number of individuals', 'Running time',
-            filename='complexity_individuals/running_time.png')
+    _complexity('individuals', start, stop, step, budget=budget,
+            directory=directory, verbose=verbose, **kwargs)
 
 
-def complexity_alternatives(start, stop, step, verbose=True, 
-        **kwargs):
+def complexity_alternatives(start, stop, step, budget=np.infty, 
+        directory='complexity_alternatives', verbose=True, **kwargs):
     """Run multiple simulations with a varying average number of alternatives 
     and compute time complexity of the algorithm.
 
-    The simulation are run with an infinite budget, by default.
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
-    All the graphs generated are stored in the directory complexity_alternatives/.
 
     :start: start value for the interval of average number of alternatives
     :stop: end value for the interval of average number of alternatives, this 
     value is not include in the interval
     :step: spacing between values in the interval
+    :budget: budget used to run the algorithm, by default budget is infinite
+    :directory: string specifying the directory where the files are stored
     :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
-    # Create the directory complexity_alternatives/.
-    try:
-        os.mkdir('complexity_alternatives')
-    except FileExistsError:
-        pass
-    # Compute the interval of values for the number of individuals.
-    X = np.arange(start, stop, step, dtype=int)
-    if verbose:
-        # Print a progress bar of duration the number of simulations.
-        bar = _known_custom_bar(len(X), 'Running simulations')
-    # Generate empty lists to store the computing times.
-    generating_times = []
-    cleaning_times = []
-    running_times = []
-    # Run a simulation for each value in the interval and store relevant
-    # results.
-    for i, x in enumerate(X):
-        if verbose:
-            bar.update(i)
-        data = Data()
-        time0 = time.time()
-        # Generate the data.
-        data.generate(mean_nb_alternatives=x, verbose=False, **kwargs)
-        time1 = time.time()
-        generating_times.append(time1 - time0)
-        # Clean the data.
-        data.clean(verbose=False)
-        time2 = time.time()
-        cleaning_times.append(time2 - time1)
-        # Run the algorithm.
-        data.run_algorithm(verbose=False)
-        time3 = time.time()
-        running_times.append(time3 - time2)
-    bar.finish()
-    # Plot graphs showing time complexity.
-    _plot_scatter(X, generating_times, 
-            'Time Complexity with the Number of Individuals ' 
-            + '(Generating Time)', 
-            'Number of individuals', 'Generating time',
-            filename='complexity_alternatives/generating_time.png')
-    _plot_scatter(X, cleaning_times, 
-            'Time Complexity with the Number of Individuals '
-            + '(Cleaning Time)',
-            'Number of individuals', 'Cleaning time',
-            filename='complexity_alternatives/cleaning_times.png')
-    _plot_scatter(X, running_times, 
-            'Time Complexity with the Number of Individuals '
-            + '(Running Time)',
-            'Number of individuals', 'Running time',
-            filename='complexity_alternatives/running_time.png')
+    _complexity('alternatives', start, stop, step, budget=budget,
+            directory=directory, verbose=verbose, **kwargs)
+
+
+def complexity_budget(start, stop, step, directory='complexity_budget',
+        verbose=True, **kwargs):
+    """Run multiple simulations with a varying budget and compute time 
+    complexity of the algorithm.
+
+    To specify the parameters for the generation process, use the same syntax as
+    for the method Data.generate().
+
+    :start: start value for the interval of budget
+    :stop: end value for the interval of budget, this value is not include in the 
+    interval
+    :step: spacing between values in the interval
+    :directory: string specifying the directory where the files are stored
+    :verbose: if True, a progress bar and some information are displayed during
+    the process, default is True
+
+    """
+    _complexity('budget', start, stop, step, directory=directory, 
+            verbose=verbose, **kwargs)
