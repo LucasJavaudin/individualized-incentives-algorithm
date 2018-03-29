@@ -1785,13 +1785,15 @@ def run_from_file(filename, budget=np.infty, directory='files', delimiter=',',
             delimiter=delimiter, comment=comment, verbose=verbose)
 
 
-def _complexity(varying_parameter, start, stop, step, budget=np.infty, 
+def _complexity(varying_parameter, string, start, stop, step, budget=np.infty, 
         directory='complexity', verbose=True, **kwargs):
     """Run multiple simulations with a parameter varying and compute time
     complexity of the algorithm.
 
     :varying_parameter: string specifying the parameter which varies across
     simulations, possible values are 'individuals', 'alternatives' and 'budget'
+    :string: string with the name of the varying parameter, used to label the
+    graphs
     :start: start value for the interval of number of individuals
     :stop: end value for the interval of number of individuals, this value is
     not include in the interval
@@ -1847,12 +1849,6 @@ def _complexity(varying_parameter, start, stop, step, budget=np.infty,
         running_times.append(time3 - time2)
     bar.finish()
     # Plot graphs showing time complexity.
-    if varying_parameter == 'individuals':
-        string = 'Number of Individuals'
-    elif varying_parameter == 'alternatives':
-        string = 'Average Number of Alternatives'
-    elif varying_parameter == 'budget':
-        string = 'Budget'
     _plot_scatter(
             X, 
             generating_times, 
@@ -1899,7 +1895,8 @@ def complexity_individuals(start, stop, step, budget=np.infty,
     the process, default is True
 
     """
-    _complexity('individuals', start, stop, step, budget=budget,
+    string = 'Number of Individuals'
+    _complexity('individuals', string, start, stop, step, budget=budget,
             directory=directory, verbose=verbose, **kwargs)
 
 
@@ -1921,7 +1918,8 @@ def complexity_alternatives(start, stop, step, budget=np.infty,
     the process, default is True
 
     """
-    _complexity('alternatives', start, stop, step, budget=budget,
+    string = 'Average Number of Alternatives'
+    _complexity('alternatives', string, start, stop, step, budget=budget,
             directory=directory, verbose=verbose, **kwargs)
 
 
@@ -1942,5 +1940,6 @@ def complexity_budget(start, stop, step, directory='complexity_budget',
     the process, default is True
 
     """
-    _complexity('budget', start, stop, step, directory=directory, 
+    string = 'Budget'
+    _complexity('budget', string, start, stop, step, directory=directory, 
             verbose=verbose, **kwargs)
