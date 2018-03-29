@@ -1646,8 +1646,8 @@ def _simulation(budget=np.infty, verbose=True, **kwargs):
 
 
 def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
-    """Generate all the files and graphs while generating random data and
-    running the algorithm.
+    """Create files and graphs while generating random data and running the 
+    algorithm.
 
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
@@ -1656,7 +1656,6 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     The generated graphs are efficiency curve, efficiency evolution, incentives
     evolution, energy gains evolution, bounds, individuals who moved and
     individuals at first best.
-    All the files and graphs generated are stored in the same directory.
 
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: directory where the files are stored, must be a string, default
@@ -1721,6 +1720,86 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     total_time = time.time() - init_time
     if verbose:
         print('Simulation successfully run in ' 
+              + str(round(total_time, 2)) 
+              + 's.')
+
+
+def run_from_file(filename, budget=np.infty, directory='files', verbose=True):
+    """Read data from a file and run the algorithm.
+
+    The generated files are the data, data characteristics, the results and results
+    characteristics.
+    The generated graphs are efficiency curve, efficiency evolution, incentives
+    evolution, energy gains evolution, bounds, individuals who moved and
+    individuals at first best.
+
+    :filename: string with the name of the file containing the data
+    :budget: budget used to run the algorithm, by default budget is infinite
+    :directory: directory where the files are stored, must be a string, default
+    is 'files'
+    :verbose: if True, display progress bars and some information
+
+    """
+    # Store the starting time.
+    init_time = time.time()
+    if verbose:
+        print('Running simulation...')
+    # Create the directory used to store the files.
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+    # Import the data.
+    data = Data()
+    data.read(filename, verbose=verbose)
+    # Run the algorithm.
+    results = data.run_algorithm(budget=budget, verbose=verbose)
+    # Generate the files and the graphs.
+    results.data.output_data(filename=directory+'/data.txt', verbose=verbose)
+    results.data.output_characteristics(
+            filename=directory+'/data_characteristics.txt',
+            verbose=verbose
+            )
+    results.output_results(
+            filename=directory+'/results.txt', 
+            verbose=verbose
+            )
+    results.output_characteristics(
+            filename=directory+'/results_characteristics.txt', 
+            verbose=verbose
+            )
+    results.plot_efficiency_curve(
+            filename=directory+'/efficiency_curve.png',
+            verbose=verbose
+            )
+    results.plot_efficiency_evolution(
+            filename=directory+'/efficiency_evolution.png',
+            verbose=verbose
+            )
+    results.plot_incentives_evolution(
+            filename=directory+'/incentives_evolution.png',
+            verbose=verbose
+            )
+    results.plot_energy_gains_evolution(
+            filename=directory+'/energy_gains_evolution.png',
+            verbose=verbose
+            )
+    results.plot_bounds(
+            filename=directory+'/bounds.png', 
+            verbose=verbose
+            )
+    results.plot_individuals_who_moved(
+            filename=directory+'/individuals_who_moved.png',
+            verbose=verbose
+            )
+    results.plot_individuals_at_first_best(
+            filename=directory+'/individuals_at_first_best.png',
+            verbose=verbose
+            )
+    # Store the total time to run the simulation.
+    total_time = time.time() - init_time
+    if verbose:
+        print('Algorithm successfully run in ' 
               + str(round(total_time, 2)) 
               + 's.')
 
