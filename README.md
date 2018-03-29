@@ -33,7 +33,7 @@ You can change the value of the parameters used in the generating process:
 - _random_utility_parameter_ (default: 10): parameter of the distribution used to generate stochastic utility (Gumbel or Logistic)
 - _utility_mean_ (default: 1): mean parameter for the log-normal distribution used to generate the utility of the alternatives
 - _utility_sd_ (default: 1): standard-deviation parameter for the log-normal distribution used to generate the utility of the alternatives
-- _alpha_ (default: 1): energy consumption of an alternative is defined by alpha * (U ^ gamma) + beta where U is the utility of the alternative
+- _alpha_ (default: 1): energy consumption of an alternative is defined by _alpha * (U ^ gamma) + beta_ where _U_ is the utility of the alternative
 - _beta_ (default: 0): see alpha
 - _gamma_ (default: 1): see alpha
 
