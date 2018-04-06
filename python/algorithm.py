@@ -545,8 +545,10 @@ class Data:
                   + str(self.nb_efficiency_removed) 
                   + ' efficiency-dominated alternatives.'
                  )
-        # The Pareto-dominated alternatives are now removed.
+        # The efficiency-dominated alternatives are now removed.
         self.efficiency_dominated_removed = True
+        # The Pareto-dominate alternatives are also removed, by definition.
+        self.pareto_dominated_removed = True
         # Store the time spent to remove the Pareto-dominated alternatives.
         self.efficiency_removing_time = time.time() - init_time
 
@@ -749,6 +751,43 @@ class Data:
         efficiencies = np.array(efficiencies)
         return efficiencies, alternatives
 
+    def _next_best_jumps(self, state):
+        """Compute the efficiency of the best jump of all individuals when the
+        efficiency-dominated alternatives are removed .
+
+        :state: a list or a numpy array with the current choice of all the
+        individuals
+        :returns: a numpy array with the efficiency of the best jumps
+
+        """
+        efficiencies = []
+        for i in range(self.individuals):
+            efficiency = self._next_efficiency(i, state[i])
+            efficiencies.append(efficiency)
+        efficiencies = np.array(efficiencies)
+        return efficiencies
+
+    def _next_efficiency(self, individual, choice):
+        """Compute the efficiency of the best jump on one individual when the
+        efficiency-dominated alternatives are removed.
+
+        :individual: the index of the considered individual, should be an integer
+        :choice: the index of the choice of the individual, should be an
+        integer
+        :returns: a float indicating the efficiency of the best jump
+
+        """
+        # Only try to compute the efficiency if the individuals is not at
+        # his last alternative.
+        if choice != self.alternatives_per_individual[individual]-1:
+            # The best jump is simply the jump to the next alternative.
+            max_efficiency = self._single_jump_efficiency(individual, 
+                                                          choice, 
+                                                          choice+1)
+        else:
+            max_efficiency = 0
+        return max_efficiency
+
     def _incentives_amount(self, individual, previous_alternative,
             next_alternative):
         """Compute the amount of incentives needed to induce the individual to
@@ -815,6 +854,9 @@ class Data:
         # are removed.
         if not self.pareto_dominated_removed:
             self.remove_pareto_dominated(verbose=verbose)
+        # The data must be sorted.
+        if not self.is_sorted:
+            self.sort(verbose=verbose)
         # Store the starting time.
         init_time = time.time()
         if verbose:
@@ -837,8 +879,11 @@ class Data:
         else:
             # Compute the efficiency and the resulting alternative of the best 
             # jump of all individuals.
-            best_efficiencies, best_alternatives = \
-                self._all_best_jump(results.optimal_state)
+            if self.efficiency_dominated_removed:
+                best_efficiencies = self._next_best_jumps(results.optimal_state)
+            else:
+                best_efficiencies, best_alternatives = \
+                    self._all_best_jump(results.optimal_state)
             # Main loop of the algorithm.
             # The loop runs until the budget is depleted or until all the jumps
             # have been done.
@@ -857,7 +902,10 @@ class Data:
                 # alternative, next alternative).
                 previous_alternative = \
                     results.optimal_state[selected_individual]
-                next_alternative = best_alternatives[selected_individual]
+                if self.efficiency_dominated_removed:
+                    next_alternative = previous_alternative + 1
+                else:
+                    next_alternative = best_alternatives[selected_individual]
                 jump_information = [selected_individual,
                                      previous_alternative,
                                      next_alternative]
@@ -870,11 +918,18 @@ class Data:
                 results.optimal_state[selected_individual] = next_alternative
                 # Update the arrays of the best jumps for the selected
                 # individual.
-                new_best_efficiency, new_best_alternative = \
-                    self._individual_best_jump(selected_individual,
-                                               next_alternative)
-                best_efficiencies[selected_individual] = new_best_efficiency
-                best_alternatives[selected_individual] = new_best_alternative
+                if self.efficiency_dominated_removed:
+                    new_best_efficiency = self._next_efficiency(
+                                                        selected_individual, 
+                                                        next_alternative
+                                                        )
+                    best_efficiencies[selected_individual] = new_best_efficiency
+                else:
+                    new_best_efficiency, new_best_alternative = \
+                        self._individual_best_jump(selected_individual,
+                                                   next_alternative)
+                    best_efficiencies[selected_individual] = new_best_efficiency
+                    best_alternatives[selected_individual] = new_best_alternative
                 # Increase the expenses by the amount of incentives of the jump.
                 incentives = self._incentives_amount(*jump_information)
                 results.expenses += incentives
@@ -1731,13 +1786,16 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
         plt.close()
 
 
-def _simulation(budget=np.infty, verbose=True, **kwargs):
+def _simulation(budget=np.infty, rem_eff=True, 
+        verbose=True, **kwargs):
     """Generate random data and run the algorithm.
 
     To specify the parameters for the generation process, use the same syntax as
     for the method Data.generate().
 
     :budget: budget used to run the algorithm, by default budget is infinite
+    :rem_eff: if True, the efficiency dominated alternatives
+    are removed before the algorithm is run
     :verbose: if True, display progress bars and some information
     :returns: an AlgorithmResults object with the results of the algorithm run
 
@@ -1746,13 +1804,17 @@ def _simulation(budget=np.infty, verbose=True, **kwargs):
     data = Data()
     # Generate random data.
     data.generate(verbose=verbose, **kwargs)
+    if rem_eff:
+        # Remove the efficiency dominated alternatives.
+        data.remove_efficiency_dominated(verbose=verbose)
     # Run the algorithm.
     results = data.run_algorithm(budget=budget, verbose=verbose)
     return results
 
 
 def _run_algorithm(simulation=None, filename=None, budget=np.infty,
-        directory='files', delimiter=',', comment='#', verbose=True, **kwargs):
+        remove_efficiency_dominated = True, directory='files', delimiter=',', 
+        comment='#', verbose=True, **kwargs):
     """Run the algorithm and generate files and graphs.
 
     The algorithm can be run with generated data or with imported data.
@@ -1761,6 +1823,8 @@ def _run_algorithm(simulation=None, filename=None, budget=np.infty,
     imported
     :filename: string with the name of the file containing the data
     :budget: budget used to run the algorithm, by default budget is infinite
+    :remove_efficiency_dominated: if True, the efficiency dominated alternatives
+    are removed before the algorithm is run
     :directory: directory where the files are stored, must be a string, default
     is 'files'
     :delimiter: the character used to separated the utility and the energy
@@ -1779,7 +1843,10 @@ def _run_algorithm(simulation=None, filename=None, budget=np.infty,
         pass
     if simulation:
         # Run the simulation.
-        results = _simulation(budget=budget, verbose=verbose, **kwargs)
+        results = _simulation(budget=budget,
+                              rem_eff=remove_efficiency_dominated, 
+                              verbose=verbose, 
+                              **kwargs)
     else:
         # Import the data.
         data = Data()
