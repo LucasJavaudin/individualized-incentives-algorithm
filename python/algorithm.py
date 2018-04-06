@@ -10,6 +10,8 @@ import time
 import progressbar
 import os
 
+from scipy.spatial import ConvexHull
+
 
 ###########
 #  Class  #
@@ -61,6 +63,7 @@ class Data:
         self.output_characteristics_time = None
         self.sorting_time = None
         self.pareto_removing_time = None
+        self.efficiency_removing_time = None
 
     def _append(self, narray):
         """Append the specified numpy array to the Data object.
@@ -212,9 +215,13 @@ class Data:
             bar = _known_custom_bar(individuals, 'Generating data')
         # The Data object is generated from a random sample
         self.generate_data = True
-        # Generate a list with the number of alternatives of all individuals from a
-        # Poisson law.
-        nb_alternatives = np.random.poisson(mean_nb_alternatives-1, individuals) + 1
+        if use_poisson:
+            # Generate a list with the number of alternatives of all individuals from a
+            # Poisson law.
+            nb_alternatives = np.random.poisson(mean_nb_alternatives-1, individuals) + 1
+        else:
+            # All individuals have the same number of alternatives.
+            nb_alternatives = np.repeat(mean_nb_alternatives, individuals)
         for i in range(individuals):
             # Generate deterministic utility from a log-normal distribution with mean
             # utility_mean and standard-deviation utility_sd.
@@ -396,7 +403,7 @@ class Data:
         # Indicate if the Pareto-dominated alternatives are removed.
         if self.pareto_dominated_removed:
             output_file.write('\n' 
-                              + str(self.pareto_removed) 
+                              + str(self.nb_pareto_removed) 
                               + ' Pareto-dominated alternatives were removed')
         else:
             output_file.write('\nThe Pareto-dominated alternatives are not'
@@ -446,17 +453,102 @@ class Data:
         # Update the total number of alternatives.
         self.total_alternatives -= nb_removed
         # Store the number of removed alternatives.
-        self.pareto_removed = nb_removed
+        self.nb_pareto_removed = nb_removed
         if verbose:
             bar.finish()
             print('Successfully removed ' 
-                  + str(self.pareto_removed) 
+                  + str(self.nb_pareto_removed) 
                   + ' Pareto-dominated alternatives.'
                  )
         # The Pareto-dominated alternatives are now removed.
         self.pareto_dominated_removed = True
         # Store the time spent to remove the Pareto-dominated alternatives.
         self.pareto_removing_time = time.time() - init_time
+
+    def remove_efficiency_dominated(self, verbose=True):
+        """Remove the efficiency-dominated alternatives.
+
+        :verbose: if True, a progress bar and some information are displayed during
+        the process, default is True
+
+        """
+        # Ensure the data are sorted before cleaning.
+        #if not self.is_sorted:
+            #self.sort(verbose=verbose)
+        # Store the starting time.
+        init_time = time.time()
+        if verbose:
+            bar = _known_custom_bar(self.individuals, 
+                                    'Cleaning data (effic.)')
+        # Variable used to count the number of removed alternatives.
+        nb_removed = 0
+        for i in range(self.individuals):
+            if verbose:
+                bar.update(i)
+            # Store the alternatives of the individual.
+            alternatives_list = self.list[i]
+            # Compute the alternative with the largest utility and with the
+            # lowest energy consumption.
+            first_choice = np.argmax(alternatives_list[:, 0])
+            last_choice = np.argmin(alternatives_list[:, 1])
+            # If the choice with the individual best choice is also the social
+            # best choice, the individual has only one relevant alternative.
+            if first_choice == last_choice:
+                self.list[i] = np.array([alternatives_list[first_choice]])
+                nb_removed += self.alternatives_per_individual[i] - 1
+                self.alternatives_per_individual[i] = 1
+            else:
+                # If there are only two alternatives, both are non-efficiency
+                # dominated.
+                if self.alternatives_per_individual[i] == 2:
+                    pass
+                else:
+                    # Compute the convex hull.
+                    hull = ConvexHull(alternatives_list)
+                    # The vertices are the indices of the points on the convex hull.
+                    v = hull.vertices
+                    # Compute the position in v of the first and last choice (they
+                    # are always on the convex hull).
+                    pos_first = [i for i, x in enumerate(v) if x==first_choice][0]
+                    pos_last = [i for i, x in enumerate(v) if x==last_choice][0]
+                    # The points are in counterclockwise order.
+                    if pos_first < pos_last:
+                        # The non-efficiency dominated choices are all points of the
+                        # convex hull before pos_first and after pos_last.
+                        x = v[:pos_first+1]
+                        x = np.append(x, v[pos_last:])
+                    else:
+                        # The non-efficiency dominated choices are all points of the
+                        # convex hull between pos_last and pos_first.
+                        x = v[pos_last:pos_first+1]
+                    if len(x)==0:
+                        print(self.list[i])
+                        print(pos_first)
+                        print(pos_last)
+                        print(v)
+                        print('\n')
+                    # Update the array for the individual.
+                    self.list[i] = alternatives_list[x]
+                    # Count the number of alternatives for the individual.
+                    n = self.list[i].shape[0]
+                    # Count the number of removed alternatives.
+                    nb_removed += self.alternatives_per_individual[i] - n
+                    # Update the number of alternatives of the individual.
+                    self.alternatives_per_individual[i] = n
+        # Update the total number of alternatives.
+        self.total_alternatives -= nb_removed
+        # Store the number of removed alternatives.
+        self.nb_efficiency_removed = nb_removed
+        if verbose:
+            bar.finish()
+            print('Successfully removed ' 
+                  + str(self.nb_efficiency_removed) 
+                  + ' efficiency-dominated alternatives.'
+                 )
+        # The Pareto-dominated alternatives are now removed.
+        self.efficiency_dominated_removed = True
+        # Store the time spent to remove the Pareto-dominated alternatives.
+        self.efficiency_removing_time = time.time() - init_time
 
     def sort(self, verbose=True):
         """Sort the data by utility, then by energy consumption.
