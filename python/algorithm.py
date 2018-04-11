@@ -876,6 +876,8 @@ class Data:
         if (not force) and (budget >= results.max_expenses):
             results.optimal_state = results.last_state
             results.expenses = results.max_expenses
+            if verbose:
+                bar.finish()
         else:
             # Compute the efficiency and the resulting alternative of the best 
             # jump of all individuals.
@@ -963,6 +965,127 @@ class Data:
                 results.efficiencies_history = results.efficiencies_history[:-1]
                 results.incentives_history = results.incentives_history[:-1]
                 results.energy_gains_history = results.energy_gains_history[:-1]
+            # Indicate that the algorithm was fully run.
+            results.run_algorithm = True
+        if verbose:
+            bar.finish()
+        # Store the time spent to run the algorithm.
+        results.algorithm_running_time = time.time() - init_time
+        return results
+
+    def run_lite_algorithm(self, budget=np.infty, force=True, verbose=True):
+        """Compute the optimal state for a given budget by running a modified
+        version of the Algorithm, usable only when the efficiency-dominated
+        alternatives are removed.
+
+        If the available budget is enough to reach the state where all 
+        individuals are at their last alternative and if force is False, then 
+        the algorithm is not run and the state is directly returned.
+
+        :budget: should be an integer or a float with the maximum amount of
+        incentives to give, default is np.infty (the budget is unlimited).
+        :force: if True, force the algorithm to run even if it is not necessary,
+        default is True.
+        :verbose: if True, a progress bar and some information are displayed 
+        during the process, default is True
+        :returns: an AlgorithmResults object
+
+        """
+        # Running the lite algorithm only work if the efficiency-dominated 
+        # alternatives are removed.
+        if not self.efficiency_dominated_removed:
+            self.remove_efficiency_dominated(verbose=verbose)
+        # The data must be sorted.
+        if not self.is_sorted:
+            self.sort(verbose=verbose)
+        # Store the starting time.
+        init_time = time.time()
+        if verbose:
+            if budget == np.infty:
+                bar = _known_custom_bar(
+                    self.total_alternatives - self.individuals,
+                    'Running algorithm'
+                )
+            else:
+                bar = _known_custom_bar(budget, 
+                                        'Running algorithm')
+        # Create an AlgorithmResults object where the variables are stored.
+        results = AlgorithmResults(self, budget)
+        # Compute the amount of expenses needed to reach the state where all
+        # individuals are at their last alternative.
+        # Return the last state if the budget is enough to reach it.
+        if (not force) and (budget >= results.max_expenses):
+            results.optimal_state = results.last_state
+            results.expenses = results.max_expenses
+            if verbose:
+                bar.finish()
+        else:
+            # Compute the array jump_list with informations on all the possible
+            # jumps (individual, initial alternative, incentive amount, energy
+            # gains and efficiency).
+            # The total number of jumps is the number of alternatives minus 1
+            # for each individual.
+            total_nb_jump = self.total_alternatives-self.individuals
+            # Create an empty array and a counter used to fill the empty array.
+            jump_list = np.empty([total_nb_jump, 5])
+            J = 0
+            print('start loop')
+            for i in range(self.individuals):
+                # Compute 5 lists with informations on the jumps of the
+                # individual.
+                nb_jump = self.alternatives_per_individual[i]-1
+                individual = np.repeat(i, nb_jump)
+                initial_alternatives = np.arange(0, nb_jump, 1)
+                incentives = np.array(
+                        [self._incentives_amount(i, j, j+1) 
+                            for j in initial_alternatives]
+                        )
+                energy_gains = np.array(
+                        [self._energy_gains_amount(i, j, j+1) 
+                            for j in initial_alternatives]
+                        )
+                efficiencies = energy_gains / incentives
+                # Fill the jump_list array with the computed lists.
+                jump_list[J:J+nb_jump] = np.transpose(np.array(
+                    [individual, 
+                     initial_alternatives, 
+                     incentives, 
+                     energy_gains, 
+                     efficiencies]
+                ))
+                # Increase the counter.
+                J += nb_jump
+            print('start sort')
+            # Sort the jump_list array by efficiency.
+            jump_list = jump_list[jump_list[:,4].argsort()[::-1]]
+            # The expenses are the cumulative sum of the incentives.
+            expenses = np.cumsum(jump_list[:,2])
+            # Search after how many jumps the budget is depleted.
+            results.iteration = np.searchsorted(expenses, budget)
+            # Store informations on the jumps.
+            selected_individuals = jump_list[:results.iteration,0].astype(int)
+            previous_alternatives = jump_list[:results.iteration,1].astype(int)
+            next_alternatives = previous_alternatives + 1
+            results.jumps_history = np.array(
+                    [selected_individuals, 
+                     previous_alternatives, 
+                     next_alternatives]
+            )
+            results.incentives_history = jump_list[:results.iteration,2]
+            results.energy_gains_history = jump_list[:results.iteration,3]
+            results.efficiencies_history = jump_list[:results.iteration,4]
+            # To compute the optimal state, count the number of occurrence of
+            # each individual in the selected_individuals list.
+            count = np.unique(selected_individuals, return_counts=True)
+            # Change the optimal state to the number of occurrence for
+            # individuals who moved. The value stays at 0 for individual who did
+            # not moved.
+            results.optimal_state[count[0]] = count[1]
+            # Compute the expenses and total energy gains using the cumulative
+            # sum of the incentives and the energy gains.
+            results.expenses = expenses[results.iteration-1]
+            energy_gains = np.cumsum(jump_list[:results.iteration,3])
+            results.total_energy_gains = energy_gains[-1]
             # Indicate that the algorithm was fully run.
             results.run_algorithm = True
         if verbose:
