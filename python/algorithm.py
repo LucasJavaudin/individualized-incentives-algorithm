@@ -549,6 +549,8 @@ class Data:
         self.efficiency_dominated_removed = True
         # The Pareto-dominate alternatives are also removed, by definition.
         self.pareto_dominated_removed = True
+        # The data are now unsorted.
+        self.is_sorted = False
         # Store the time spent to remove the Pareto-dominated alternatives.
         self.efficiency_removing_time = time.time() - init_time
 
