@@ -1,4 +1,4 @@
-PWD /home/lucas_javaudin/projects/algo/doc/report
+PWD /home/lucas_javaudin/projects/individualized-incentives-algorithm/doc/report
 INPUT /usr/share/texmf-dist/web2c/texmf.cnf
 INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
 INPUT report.tex
@@ -444,7 +444,7 @@ INPUT /usr/share/texmf-dist/tex/generic/babel/switch.def
 INPUT /usr/share/texmf-dist/tex/generic/babel-english/english.ldf
 INPUT /usr/share/texmf-dist/tex/generic/babel-english/english.ldf
 INPUT /usr/share/texmf-dist/tex/generic/babel/babel.def
-INPUT /usr/share/texmf-dist/tex/generic/babel/switch.def
+INPUT /usr/share/texmf-dist/tex/generic/babel/txtbabel.def
 INPUT report.aux
 INPUT report.aux
 OUTPUT report.aux
@@ -460,13 +460,6 @@ INPUT /usr/share/texmf-dist/tex/latex/oberdiek/pdflscape.sty
 INPUT /usr/share/texmf-dist/tex/latex/oberdiek/pdflscape.sty
 INPUT /usr/share/texmf-dist/tex/latex/graphics/lscape.sty
 INPUT /usr/share/texmf-dist/tex/latex/graphics/lscape.sty
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ensPS.png
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ensPS.png
-OUTPUT report.pdf
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ensPS.png
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ups.jpg
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ups.jpg
-INPUT /home/lucas_javaudin/texmf/tex/latex/class_javaudin/ups.jpg
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecrm2488.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecbx2488.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecbx2074.tfm
@@ -494,6 +487,7 @@ INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecbx1000.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecbx1440.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecbx1200.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/jknappen/ec/ecti1000.tfm
+OUTPUT report.pdf
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
 INPUT /usr/share/texmf-dist/tex/latex/hyperref/nameref.sty
 INPUT /usr/share/texmf-dist/tex/latex/hyperref/nameref.sty

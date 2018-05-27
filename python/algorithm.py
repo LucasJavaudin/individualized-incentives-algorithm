@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import time
 import progressbar
 import os
+import itertools
 
 from scipy.spatial import ConvexHull
 
@@ -56,6 +57,7 @@ class Data:
         self.generated_data = False
         self.is_sorted = False
         self.pareto_dominated_removed = False
+        self.nb_pareto_removed = 0
         self.efficiency_dominated_removed = False
         self.read_time = None
         self.generating_time = None
@@ -154,10 +156,10 @@ class Data:
         # Store the time spent to read data.
         self.read_time = time.time() - init_time
 
-    def generate(self, individuals=1000, mean_nb_alternatives=10, utility_mean=1,
+    def old_generate(self, individuals=1000, mean_nb_alternatives=10, utility_mean=1,
                  utility_sd=1, random_utility_parameter=10, alpha=1, beta=0,
                  gamma=1, use_poisson=True, use_gumbel=False, verbose=True):
-        """Generate a random data.
+        """Generate a random data (old method).
 
         First, the number of alternatives of each individual is generated from a
         Poisson law or is set deterministically.
@@ -247,6 +249,89 @@ class Data:
             # Append the numpy array (utility, energy) to the data object.
             individual = np.stack((utility, energy), axis=1)
             self._append(individual)
+            if verbose:
+                # Update the progress bar.
+                bar.update(i)
+        if verbose:
+            bar.finish()
+        # Inform that the data were randomly generated.
+        self.generated_data = True
+        # Store the time spent to generate data.
+        self.generating_time = time.time() - init_time
+
+    def generate(self, individuals=1000, mean_nb_alternatives=10,
+                utility_variance=1, energy_variance=1, correlation=0, 
+                use_poisson=True, verbose=True):
+        """Generate a random data. 
+
+        First, the number of alternatives of each individual is generated from a
+        Poisson law or is set deterministically.
+        For each alternative, utility and energy consumption are jointly
+        normally distributed with zero means.
+        The variance of utility and energy and the correlation coefficient are 
+        parameters.
+
+        :individuals: number of individuals in the generated data, should be an
+        integer greater than 2, default is 1000
+        :mean_nb_alternatives: the parameter of the Poisson law used to generate the
+        number of alternatives is (mean_nb_alternatives - 1), should be strictly
+        greater than 1, should be an integer if use_poisson is false, default is 10
+        :utility_variance: variance of the normal distribution for utility,
+        should be positive
+        :energy_variance: variance of the normal distribution for energy
+        consumption, should be positive
+        :correlation: correlation coefficient between utility and energy
+        consumption
+        :use_poisson: if True the number of alternatives is drawn from a modified
+        Poisson distribution with parameter (mean_nb_alternatives - 1), else the
+        number of alternatives is equal to mean_nb_alternatives for all
+        individuals, default is True
+        :verbose: if True, a progress bar and some information are displayed during
+        the process, default is True
+
+        """
+        # Store the starting time.
+        init_time = time.time()
+        assert individuals > 1 and isinstance(individuals, (int, np.int64)), \
+                'The parameter individuals should be an integer greater than 2'
+        assert mean_nb_alternatives > 1, \
+                """The parameter mean_nb_alternatives should be stricty greater than
+                1"""
+        assert isinstance(mean_nb_alternatives, int) or use_poisson == True, \
+                """The parameter mean_nb_alternatives should be an integer when
+                use_poisson is false"""
+        assert utility_variance >= 0, \
+                'The parameter utility_variance should be positive'
+        assert energy_variance >= 0, \
+                'The parameter energy_variance should be positive'
+        if verbose:
+            # Print a progress bar of duration individuals.
+            bar = _known_custom_bar(individuals, 'Generating data')
+        # The Data object is generated from a random sample
+        self.generate_data = True
+        if use_poisson:
+            # Generate a list with the number of alternatives of all individuals from a
+            # Poisson law.
+            nb_alternatives = np.random.poisson(mean_nb_alternatives-1, individuals) + 1
+        else:
+            # All individuals have the same number of alternatives.
+            nb_alternatives = np.repeat(mean_nb_alternatives, individuals)
+        for i in range(individuals):
+            # Generate utility and energy consumption from a bivariate normal
+            # distribution.
+            # The number of values generated is equal to the number of alternatives
+            # of the individual i
+            cov = [
+                    [utility_variance, correlation], 
+                    [correlation, energy_variance]
+            ]
+            values = np.random.multivariate_normal(
+                    mean=[0, 0], 
+                    cov=cov,
+                    size=nb_alternatives[i]
+            )
+            # Append the numpy array (utility, energy) to the data object.
+            self._append(values)
             if verbose:
                 # Update the progress bar.
                 bar.update(i)
@@ -401,7 +486,7 @@ class Data:
         else:
             output_file.write('\nThe data are not sorted')
         # Indicate if the Pareto-dominated alternatives are removed.
-        if self.pareto_dominated_removed:
+        if self.nb_pareto_removed:
             output_file.write('\n' 
                               + str(self.nb_pareto_removed) 
                               + ' Pareto-dominated alternatives were removed')
@@ -852,10 +937,6 @@ class Data:
         :returns: an AlgorithmResults object
 
         """
-        # Running the algorithm only work if the Pareto-dominated alternatives
-        # are removed.
-        if not self.pareto_dominated_removed:
-            self.remove_pareto_dominated(verbose=verbose)
         # The data must be sorted.
         if not self.is_sorted:
             self.sort(verbose=verbose)
@@ -1095,6 +1176,54 @@ class Data:
         # Store the time spent to run the algorithm.
         results.algorithm_running_time = time.time() - init_time
         return results
+
+    def find_optimum(self, budget=np.infty, verbose=True):
+        """Search for the optimum state by computing the energy of all the
+        states.
+
+        This function can take a very long time to run with many individuals and
+        alternatives.
+
+        :budget: should be an integer or a float with the maximum amount of
+        incentives to give, default is np.infty (the budget is unlimited).
+        :verbose: if True, a progress bar and some information are displayed 
+        during the process, default is True.
+        :returns: the optimal state and the optimal energy gains.
+        """
+        # Remove the Pareto-dominated alternatives.
+        if not self.pareto_dominated_removed:
+            self.remove_pareto_dominated(verbose=verbose)
+        # Build a list of all the possible states.
+        alternative_list = [
+                list(range(j)) for j in self.alternatives_per_individual
+        ]
+        state_list = itertools.product(*alternative_list)
+        # Compute initial utility.
+        init_state = np.zeros(self.individuals, dtype=int)
+        init_utility = self._total_utility(init_state)
+        init_energy = self._total_energy(init_state)
+        if verbose:
+            bar = _known_custom_bar(
+                np.prod(self.alternatives_per_individual),
+                'Finding optimum'
+            )
+        # If the state is not too costly, add its energy gains to the list.
+        reachable_states = []
+        for i, state in enumerate(state_list):
+            if verbose:
+                bar.update(i)
+            cost = init_utility - self._total_utility(state)
+            if cost < budget:
+                energy_gains = init_energy - self._total_energy(state)
+                reachable_states.append([state, energy_gains])
+        if verbose:
+            bar.finish()
+        # Find the state with the highest energy gains among the reachable
+        # states.
+        reachable_states = np.array(reachable_states)
+        optimal_state_index = np.argmax(reachable_states[:, 1])
+        optimum = reachable_states[optimal_state_index]
+        return optimum
 
 
 class AlgorithmResults:
@@ -1515,6 +1644,30 @@ class AlgorithmResults:
                 filename=filename
         )
 
+    def plot_expenses_curve(self, filename=None, verbose=True):
+        """Plot the expenses curve with the algorithm results.
+
+        The expenses curve relates the expenses with the iterations.
+
+        :file: string with the name of the file where the graph is saved, if
+        None show the graph but does not save it, default is None
+        :verbose: if True, some information are displayed during the process,
+        default is True
+
+        """
+        if not self.computed_results:
+            self.compute_results(verbose=verbose)
+        if verbose:
+            print('Plotting the expenses curve...')
+        _plot_step_function(
+                self.iterations_history,
+                self.expenses_history[:-1],
+                title='Expenses Curve', 
+                xlabel='Iterations', 
+                ylabel='Expenses', 
+                filename=filename
+        )
+
     def plot_incentives_evolution(self, filename=None, verbose=True):
         """Plot the evolution of the jump incentives over the iterations.
 
@@ -1535,6 +1688,30 @@ class AlgorithmResults:
                 'Iterations',
                 'Incentives',
                 regression=False,
+                filename=filename
+        )
+
+    def plot_energy_gains_curve(self, filename=None, verbose=True):
+        """Plot the energy gains curve with the algorithm results.
+
+        The energy gains curve relates the energy gains with the iterations.
+
+        :file: string with the name of the file where the graph is saved, if
+        None show the graph but does not save it, default is None
+        :verbose: if True, some information are displayed during the process,
+        default is True
+
+        """
+        if not self.computed_results:
+            self.compute_results(verbose=verbose)
+        if verbose:
+            print('Plotting the energy gains curve...')
+        _plot_step_function(
+                self.iterations_history,
+                self.total_energy_gains_history[:-1],
+                title='Energy gains Curve', 
+                xlabel='Iterations', 
+                ylabel='Energy gains', 
                 filename=filename
         )
 
@@ -1609,7 +1786,7 @@ class AlgorithmResults:
             plt.show()
         # Save the graph as a png file if a file is specified.
         else:
-            plt.savefig(filename, format='png')
+            plt.savefig(filename, dpi=300, format='png')
             plt.close()
 
     def plot_individuals_who_moved(self, filename=None, verbose=True):
@@ -1864,11 +2041,12 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
         plt.show()
     # Save the graph as a png file if a file is specified.
     else:
-        plt.savefig(filename, format='png')
+        plt.savefig(filename, dpi=300, format='png')
         plt.close()
 
 
-def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
+def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
+        left_lim=None, right_lim=None):
     """Plot a scatter.
 
     :x: list or numpy array with the x-coordinates
@@ -1900,6 +2078,11 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    # Change the limits for the x-axis.
+    if left_lim:
+        ax.set_xlim(left=left_lim)
+    if right_lim:
+        ax.set_xlim(right=right_lim)
     # Make room for the labels.
     plt.tight_layout()
     # Show the graph if no file is specified.
@@ -1907,7 +2090,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None):
         plt.show()
     # Save the graph as a png file if a file is specified.
     else:
-        plt.savefig(filename, format='png')
+        plt.savefig(filename, dpi=300, format='png')
         plt.close()
 
 
@@ -1930,14 +2113,17 @@ def _simulation(budget=np.infty, rem_eff=True,
     # Generate random data.
     data.generate(verbose=verbose, **kwargs)
     if rem_eff:
-        # Remove the efficiency dominated alternatives.
+        # Remove the efficiency dominated alternatives and run the lite version
+        # of the algorithm.
         data.remove_efficiency_dominated(verbose=verbose)
-    # Run the algorithm.
-    results = data.run_algorithm(budget=budget, verbose=verbose)
+        results = data.run_lite_algorithm(budget=budget, verbose=verbose)
+    else:
+        # Run the normal version of the algorithm.
+        results = data.run_algorithm(budget=budget, verbose=verbose)
     return results
 
 
-def _run_algorithm(simulation=None, filename=None, budget=np.infty,
+def _run_algorithm(simulation=False, filename=None, budget=np.infty,
         remove_efficiency_dominated = True, directory='files', delimiter=',', 
         comment='#', verbose=True, **kwargs):
     """Run the algorithm and generate files and graphs.
@@ -1968,10 +2154,12 @@ def _run_algorithm(simulation=None, filename=None, budget=np.infty,
         pass
     if simulation:
         # Run the simulation.
-        results = _simulation(budget=budget,
-                              rem_eff=remove_efficiency_dominated, 
-                              verbose=verbose, 
-                              **kwargs)
+        results = _simulation(
+                budget=budget,
+                rem_eff=remove_efficiency_dominated, 
+                verbose=verbose, 
+                **kwargs
+        )
     else:
         # Import the data.
         data = Data()
@@ -2000,8 +2188,16 @@ def _run_algorithm(simulation=None, filename=None, budget=np.infty,
             filename=directory+'/efficiency_evolution.png',
             verbose=verbose
             )
+    results.plot_expenses_curve(
+            filename=directory+'/expenses_curve.png',
+            verbose=verbose
+            )
     results.plot_incentives_evolution(
             filename=directory+'/incentives_evolution.png',
+            verbose=verbose
+            )
+    results.plot_energy_gains_curve(
+            filename=directory+'/energy_gains_curve.png',
             verbose=verbose
             )
     results.plot_energy_gains_evolution(
@@ -2046,8 +2242,8 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     :verbose: if True, display progress bars and some information
 
     """
-    _run_algorithm(simulation=True, budget=budget, directory=directory, verbose=verbose,
-            **kwargs)
+    _run_algorithm(simulation=True, budget=budget, directory=directory, 
+            verbose=verbose, **kwargs)
 
 
 def run_from_file(filename, budget=np.infty, directory='files', delimiter=',', 
@@ -2071,12 +2267,12 @@ def run_from_file(filename, budget=np.infty, directory='files', delimiter=',',
     :verbose: if True, display progress bars and some information
 
     """
-    _run_algorithm(simulation=False, filename=filename, budget=budget, directory=directory,
+    _run_algorithm(filename=filename, budget=budget, directory=directory,
             delimiter=delimiter, comment=comment, verbose=verbose)
 
 
 def _complexity(varying_parameter, string, start, stop, step, budget=np.infty, 
-        directory='complexity', verbose=True, **kwargs):
+        directory='complexity', remove_pareto=True, verbose=True, **kwargs):
     """Run multiple simulations with a parameter varying and compute time
     complexity of the algorithm.
 
@@ -2090,6 +2286,8 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
     :step: spacing between values in the interval
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: string specifying the directory where the files are stored
+    :remove_pareto: boolean indicating wether to remove the Pareto-dominated
+    alternatives before running the algorithm
     :verbose: if True, a progress bar and some information are displayed during
 
     """
@@ -2126,8 +2324,9 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
             data.generate(verbose=False, **kwargs)
         time1 = time.time()
         generating_times.append(time1 - time0)
-        # Remove the Pareto dominated alternatives.
-        data.remove_pareto_dominated(verbose=False)
+        if remove_pareto:
+            # Remove the Pareto dominated alternatives.
+            data.remove_pareto_dominated(verbose=False)
         time2 = time.time()
         pareto_removing_times.append(time2 - time1)
         # Run the algorithm.
@@ -2145,31 +2344,36 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
             'Time Complexity with the '+string+ '\n(Generating Time)', 
             string, 
             'Generating Time',
-            filename=directory+'/generating_time.png'
+            filename=directory+'/generating_time.png',
+            left_lim=start-step
             )
-    _plot_scatter(
-            X, 
-            pareto_removing_times, 
-            'Time Complexity with the '+string 
-            + '\n(Time to Remove Pareto-Dominated Alternatives)',
-            string, 
-            'Time to Remove Pareto-Dominated Alternatives',
-            filename=directory+'/removing_pareto_dominated_times.png'
-            )
+    if remove_pareto:
+        _plot_scatter(
+                X, 
+                pareto_removing_times, 
+                'Time Complexity with the '+string 
+                + '\n(Time to Remove Pareto-Dominated Alternatives)',
+                string, 
+                'Time to Remove Pareto-Dominated Alternatives',
+                filename=directory+'/removing_pareto_dominated_times.png',
+                left_lim=start-step
+                )
     _plot_scatter(
             X, 
             running_times, 
             'Time Complexity with the '+string + '\n(Running Time)',
             string, 
-            'Running Time',
-            filename=directory+'/running_time.png'
+            'Running Time (s)',
+            filename=directory+'/running_time.png',
+            left_lim=start-step
             )
     if verbose:
-        print('Successfully run ' + str(len(X)) + ' simulations.')
+        print('Successfully ran ' + str(len(X)) + ' simulations.')
 
 
 def complexity_individuals(start, stop, step, budget=np.infty,
-        directory='complexity_individuals', verbose=True, **kwargs):
+        directory='complexity_individuals', remove_pareto=True, verbose=True, 
+        **kwargs):
     """Run multiple simulations with a varying number of individuals and compute
     time complexity of the algorithm.
 
@@ -2182,17 +2386,21 @@ def complexity_individuals(start, stop, step, budget=np.infty,
     :step: spacing between values in the interval
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: string specifying the directory where the files are stored
+    :remove_pareto: boolean indicating wether to remove the Pareto-dominated
+    alternatives before running the algorithm
     :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
     string = 'Number of Individuals'
     _complexity('individuals', string, start, stop, step, budget=budget,
-            directory=directory, verbose=verbose, **kwargs)
+            directory=directory, remove_pareto=remove_pareto, verbose=verbose, 
+            **kwargs)
 
 
 def complexity_alternatives(start, stop, step, budget=np.infty, 
-        directory='complexity_alternatives', verbose=True, **kwargs):
+        directory='complexity_alternatives', remove_pareto=True, verbose=True, 
+        **kwargs):
     """Run multiple simulations with a varying average number of alternatives 
     and compute time complexity of the algorithm.
 
@@ -2205,17 +2413,20 @@ def complexity_alternatives(start, stop, step, budget=np.infty,
     :step: spacing between values in the interval
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: string specifying the directory where the files are stored
+    :remove_pareto: boolean indicating wether to remove the Pareto-dominated
+    alternatives before running the algorithm
     :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
     string = 'Average Number of Alternatives'
     _complexity('alternatives', string, start, stop, step, budget=budget,
-            directory=directory, verbose=verbose, **kwargs)
+            directory=directory, remove_pareto=True, verbose=verbose, 
+            **kwargs)
 
 
 def complexity_budget(start, stop, step, directory='complexity_budget',
-        verbose=True, **kwargs):
+        remove_pareto=True, verbose=True, **kwargs):
     """Run multiple simulations with a varying budget and compute time 
     complexity of the algorithm.
 
@@ -2227,10 +2438,12 @@ def complexity_budget(start, stop, step, directory='complexity_budget',
     interval
     :step: spacing between values in the interval
     :directory: string specifying the directory where the files are stored
+    :remove_pareto: boolean indicating wether to remove the Pareto-dominated
+    alternatives before running the algorithm
     :verbose: if True, a progress bar and some information are displayed during
     the process, default is True
 
     """
     string = 'Budget'
     _complexity('budget', string, start, stop, step, directory=directory, 
-            verbose=verbose, **kwargs)
+            remove_pareto=True, verbose=verbose, **kwargs)
