@@ -13,6 +13,12 @@ import itertools
 
 from scipy.spatial import ConvexHull
 
+# Define colors for the graphs.
+color1 = '#608f42'
+color2 = '#90ced6'
+color3 = '#54251e'
+
+
 
 ###########
 #  Class  #
@@ -1149,11 +1155,11 @@ class Data:
             selected_individuals = jump_list[:results.iteration,0].astype(int)
             previous_alternatives = jump_list[:results.iteration,1].astype(int)
             next_alternatives = previous_alternatives + 1
-            results.jumps_history = np.array(
+            results.jumps_history = np.transpose(np.array(
                     [selected_individuals, 
                      previous_alternatives, 
                      next_alternatives]
-            )
+            ))
             results.incentives_history = jump_list[:results.iteration,2]
             results.energy_gains_history = jump_list[:results.iteration,3]
             results.efficiencies_history = jump_list[:results.iteration,4]
@@ -1765,14 +1771,14 @@ class AlgorithmResults:
         if bounds:
             # The upper bounds are an offset efficiency curve.
             ax.step(x, self.total_energy_gains_history, 'g', where='pre', 
-                    label='Upper bounds')
+                    label='Upper bounds', color=color1)
             # The lower bounds are the efficiency curve.
             ax.step(x, self.total_energy_gains_history, 'r', where='post', 
-                    label='Lower bounds')
+                    label='Lower bounds', color=color2)
         if differences:
             # Plot the bound differences.
             ax.step(x, self.bound_differences, 'b', where='post', 
-                    label='Bound differences')
+                    label='Bound differences', color=color3)
         # Add the title and the axis label.
         ax.set_title('Energy gains bounds')
         ax.set_xlabel('Expenses')
@@ -2029,7 +2035,7 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
     # Initiate the graph.
     fig, ax = plt.subplots()
     # Plot the line.
-    ax.step(x, y, 'b', where='post')
+    ax.step(x, y, 'b', where='post', color=color1)
     # Add the title and the axis label.
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -2046,7 +2052,7 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
 
 
 def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
-        left_lim=None, right_lim=None):
+        left_lim=None, right_lim=None, bottom_lim=None, top_lim=None):
     """Plot a scatter.
 
     :x: list or numpy array with the x-coordinates
@@ -2063,13 +2069,13 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     # Initiate the graph.
     fig, ax = plt.subplots()
     # Plot the scatter.
-    ax.scatter(x, y, s=5)
+    ax.scatter(x, y, s=5, color=color1)
     # Perform a regression if necessary.
     if regression:
         reg = Regression(x, y)
         xs = np.linspace(*ax.get_xlim(), 1000)
         ys = reg.poly(xs)
-        ax.plot(xs, ys, color='red', label=reg.legend)
+        ax.plot(xs, ys, color=color2, label=reg.legend)
         ax.legend()
     # Do not show negative values on the y-axis if all values are positive.
     if ax.get_ylim()[0] < 0 and min(y) >= 0:
@@ -2079,10 +2085,14 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     # Change the limits for the x-axis.
-    if left_lim:
+    if not left_lim is None:
         ax.set_xlim(left=left_lim)
-    if right_lim:
+    if not right_lim is None:
         ax.set_xlim(right=right_lim)
+    if not bottom_lim is None:
+        ax.set_ylim(bottom=bottom_lim)
+    if not top_lim is None:
+        ax.set_ylim(top=top_lim)
     # Make room for the labels.
     plt.tight_layout()
     # Show the graph if no file is specified.
@@ -2247,7 +2257,7 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
 
 
 def run_from_file(filename, budget=np.infty, directory='files', delimiter=',', 
-        comment='#', verbose=True):
+        comment='#', verbose=True, **kwargs):
     """Read data from a file and run the algorithm.
 
     The generated files are the data, data characteristics, the results and results
@@ -2268,7 +2278,7 @@ def run_from_file(filename, budget=np.infty, directory='files', delimiter=',',
 
     """
     _run_algorithm(filename=filename, budget=budget, directory=directory,
-            delimiter=delimiter, comment=comment, verbose=verbose)
+            delimiter=delimiter, comment=comment, verbose=verbose, **kwargs)
 
 
 def _complexity(varying_parameter, string, start, stop, step, budget=np.infty, 
@@ -2345,7 +2355,8 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
             string, 
             'Generating Time',
             filename=directory+'/generating_time.png',
-            left_lim=start-step
+            left_lim=start-step,
+            bottom_lim=0
             )
     if remove_pareto:
         _plot_scatter(
@@ -2356,7 +2367,8 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
                 string, 
                 'Time to Remove Pareto-Dominated Alternatives',
                 filename=directory+'/removing_pareto_dominated_times.png',
-                left_lim=start-step
+                left_lim=start-step,
+                bottom_lim=0
                 )
     _plot_scatter(
             X, 
@@ -2365,7 +2377,8 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
             string, 
             'Running Time (s)',
             filename=directory+'/running_time.png',
-            left_lim=start-step
+            left_lim=start-step,
+            bottom_lim=0
             )
     if verbose:
         print('Successfully ran ' + str(len(X)) + ' simulations.')
@@ -2421,7 +2434,7 @@ def complexity_alternatives(start, stop, step, budget=np.infty,
     """
     string = 'Average Number of Alternatives'
     _complexity('alternatives', string, start, stop, step, budget=budget,
-            directory=directory, remove_pareto=True, verbose=verbose, 
+            directory=directory, remove_pareto=remove_pareto, verbose=verbose, 
             **kwargs)
 
 
@@ -2446,4 +2459,4 @@ def complexity_budget(start, stop, step, directory='complexity_budget',
     """
     string = 'Budget'
     _complexity('budget', string, start, stop, step, directory=directory, 
-            remove_pareto=True, verbose=verbose, **kwargs)
+            remove_pareto=remove_pareto, verbose=verbose, **kwargs)
