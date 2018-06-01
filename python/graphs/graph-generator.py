@@ -1,6 +1,19 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Define colors for the graphs.
+color1 = '#608f42'
+color2 = '#90ced6'
+color3 = '#54251e'
+
+def hex_to_rgb(value):
+    """Return (red, green, blue) for the color given as #rrggbb."""
+    value = value.lstrip('#')
+    lv = len(value)
+    rgb = list(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    rgb = [x/255 for x in rgb]
+    return rgb
+
 def scatter_choices(individual_utilities, social_utilities, current_choice, 
         size, transparency, no_transparency, numbers, label, ax, color=[1,1,1],
         marker='o'):
@@ -20,13 +33,16 @@ def scatter_choices(individual_utilities, social_utilities, current_choice,
 
     """
     J = len(individual_utilities)
-    rgba_colors = np.zeros((J, 4))
-    rgba_colors[:, 0:3] = color
-    alphas = np.append(
-            [transparency for i in range(current_choice)], 
-            [no_transparency for i in range(J - current_choice)]
-    )
-    rgba_colors[:, 3] = alphas
+    if isinstance(color, str):
+        rgba_colors = hex_to_rgb(color)
+    else:
+        rgba_colors = np.zeros((J, 4))
+        rgba_colors[:, 0:3] = color
+        alphas = np.append(
+                [transparency for i in range(current_choice)], 
+                [no_transparency for i in range(J - current_choice)]
+        )
+        rgba_colors[:, 3] = alphas
     edge_colors = np.ones((J, 4))
     edge_colors[current_choice, 0:3] = 0
     ax.scatter(
@@ -80,26 +96,26 @@ fig, ax = plt.subplots()
 
 scatter_choices(
         individual_utilities=x3, social_utilities=y3, current_choice=x3i, 
-        color=[.2, .2, .8], 
+        color=color1,
         #marker=(6,2,0),
-        size=100, transparency=.25, no_transparency=.75, 
+        size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
         label='Individual 1', 
         ax=ax
 )
 scatter_choices(
         individual_utilities=x2, social_utilities=y2, current_choice=x2i, 
-        color=[.2, .8, .2], 
-        marker=(6,1,0),
-        size=200, transparency=.25, no_transparency=.75, 
+        color=color2,
+        #marker=(6,1,0),
+        size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
         label='Individual 2', 
         ax=ax
 )
 scatter_choices(
         individual_utilities=x1, social_utilities=y1, current_choice=x1i, 
-        color=[.8, .2, .2], 
-        marker=(4,0,0),
+        color=color3,
+        #marker=(4,0,0),
         size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
         label='Individual 3', 
@@ -127,4 +143,4 @@ ax.set_title('')
 ax.set_xlabel('Individual utility')
 ax.set_ylabel('Social utility')
 
-plt.savefig('algorithm-schema.png', dpi=300, format='png')
+plt.savefig('algorithm-schema.png', dpi=1200, format='png')
