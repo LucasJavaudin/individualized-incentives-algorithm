@@ -12,6 +12,7 @@ import os
 import itertools
 
 from scipy.spatial import ConvexHull
+from matplotlib.ticker import ScalarFormatter
 
 # Define colors for the graphs.
 color1 = '#608f42'
@@ -524,8 +525,7 @@ class Data:
             # The first alternative is never Pareto-dominated.
             sorted_line = np.array([line[0]])
             # Add the other alternatives if they are not Pareto-dominated.
-            for j in range(len(line)-1):
-                j += 1
+            for j in range(1, len(line)):
                 # The energy consumption of the alternative should be strictly
                 # lower than the energy consumption of the previous non
                 # Pareto-dominated alternative.
@@ -927,7 +927,8 @@ class Data:
         energy_gains = previous_energy - next_energy
         return energy_gains
     
-    def run_algorithm(self, budget=np.infty, force=True, verbose=True):
+    def run_algorithm(self, budget=np.infty, force=True, remove_pareto=True, 
+            verbose=True):
         """Compute the optimal state for a given budget by running the algorithm.
 
         If the available budget is enough to reach the state where all 
@@ -938,6 +939,8 @@ class Data:
         incentives to give, default is np.infty (the budget is unlimited).
         :force: if True, force the algorithm to run even if it is not necessary,
         default is True.
+        :remove_pareto: if True, remove the Pareto-dominated alternatives before
+        running the algorithm
         :verbose: if True, a progress bar and some information are displayed 
         during the process, default is True
         :returns: an AlgorithmResults object
@@ -946,6 +949,9 @@ class Data:
         # The data must be sorted.
         if not self.is_sorted:
             self.sort(verbose=verbose)
+        # Remove the Pareto-dominated alternatives.
+        if not self.pareto_dominated_removed and remove_pareto:
+            self.remove_efficiency_dominated(verbose=verbose)
         # Store the starting time.
         init_time = time.time()
         if verbose:
@@ -1194,7 +1200,7 @@ class Data:
         incentives to give, default is np.infty (the budget is unlimited).
         :verbose: if True, a progress bar and some information are displayed 
         during the process, default is True.
-        :returns: the optimal state and the optimal energy gains.
+        :returns: the optimal state, the optimal energy gains and the cost.
         """
         # Remove the Pareto-dominated alternatives.
         if not self.pareto_dominated_removed:
@@ -1221,14 +1227,36 @@ class Data:
             cost = init_utility - self._total_utility(state)
             if cost < budget:
                 energy_gains = init_energy - self._total_energy(state)
-                reachable_states.append([state, energy_gains])
+                reachable_states.append((list(state), energy_gains, cost))
+        # Build a structured numpy array.
+        dtype = [
+                ('state', int, self.individuals), 
+                ('energy', float), 
+                ('cost', float)
+        ]
+        reachable_states = np.array(reachable_states, dtype=dtype)
+        if budget == np.infty:
+            # Sort the states by energy gains.
+            reachable_states = np.sort(
+                    reachable_states, 
+                    order=['cost', 'energy']
+            )
+            # Remove the Pareto-dominated states.
+            optimum = np.array([reachable_states[0]])
+            for j in range(1, len(reachable_states)):
+                if reachable_states[j]['energy'] > optimum[-1]['energy']:
+                    optimum = np.append(
+                            optimum,
+                            [reachable_states[j]], 
+                            axis=0
+                    )
+        else:
+            # Find the state with the highest energy gains among the reachable
+            # states.
+            optimal_state_index = np.argmax(reachable_states['energy'])
+            optimum = reachable_states[optimal_state_index]
         if verbose:
             bar.finish()
-        # Find the state with the highest energy gains among the reachable
-        # states.
-        reachable_states = np.array(reachable_states)
-        optimal_state_index = np.argmax(reachable_states[:, 1])
-        optimum = reachable_states[optimal_state_index]
         return optimum
 
 
@@ -1603,13 +1631,15 @@ class AlgorithmResults:
         # Store the time spent to output results.
         self.output_results_time = time.time() - init_time
 
-    def plot_efficiency_curve(self, filename=None, verbose=True):
+    def plot_efficiency_curve(self, filename=None, dpi=1200, show_title=True, 
+            verbose=True):
         """Plot the efficiency curve with the algorithm results.
 
         The efficiency curve relates the expenses with the energy gains.
 
         :file: string with the name of the file where the graph is saved, if
         None show the graph but does not save it, default is None
+        :title: title string to display on top of the graph
         :verbose: if True, some information are displayed during the process,
         default is True
 
@@ -1618,16 +1648,22 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the efficiency curve...')
+        if show_title:
+            title='Efficiency curve'
+        else:
+            title=None
         _plot_step_function(
                 self.expenses_history,
                 self.total_energy_gains_history,
-                title='Efficiency Curve', 
+                title=title,
                 xlabel='Expenses', 
                 ylabel='Energy gains', 
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
-    def plot_efficiency_evolution(self, filename=None, verbose=True):
+    def plot_efficiency_evolution(self, filename=None, dpi=1200,
+            show_title=True, verbose=True):
         """Plot the evolution of the jump efficiency over the iterations.
 
         :file: string with the name of the file where the graph is saved, if
@@ -1640,17 +1676,24 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the evolution of the jump efficiency...')
+        if show_title:
+            title='Evolution of the Efficiency of the Jumps'
+        else:
+            title=None
         _plot_scatter(
                 self.iterations_history,
                 self.efficiencies_history,
-                'Evolution of the Efficiency of the Jumps',
+                title,
                 'Iterations',
                 'Efficiency',
                 regression=False,
-                filename=filename
+                filename=filename,
+                log_scale=True,
+                dpi=dpi,
         )
 
-    def plot_expenses_curve(self, filename=None, verbose=True):
+    def plot_expenses_curve(self, filename=None, dpi=1200, show_title=True,
+            verbose=True):
         """Plot the expenses curve with the algorithm results.
 
         The expenses curve relates the expenses with the iterations.
@@ -1665,16 +1708,22 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the expenses curve...')
+        if show_title:
+            title='Expenses Curve'
+        else:
+            title=None
         _plot_step_function(
                 self.iterations_history,
                 self.expenses_history[:-1],
-                title='Expenses Curve', 
+                title=title,
                 xlabel='Iterations', 
                 ylabel='Expenses', 
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
-    def plot_incentives_evolution(self, filename=None, verbose=True):
+    def plot_incentives_evolution(self, filename=None, dpi=1200,
+            show_title=True, verbose=True):
         """Plot the evolution of the jump incentives over the iterations.
 
         :file: string with the name of the file where the graph is saved, if
@@ -1687,17 +1736,23 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the evolution of the jump incentives...')
+        if show_title:
+            title='Evolution of the Incentives of the Jumps'
+        else:
+            title=None
         _plot_scatter(
                 self.iterations_history,
                 self.incentives_history,
-                'Evolution of the Incentives of the Jumps',
+                title,
                 'Iterations',
                 'Incentives',
                 regression=False,
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
-    def plot_energy_gains_curve(self, filename=None, verbose=True):
+    def plot_energy_gains_curve(self, filename=None, dpi=1200, show_title=True,
+            verbose=True):
         """Plot the energy gains curve with the algorithm results.
 
         The energy gains curve relates the energy gains with the iterations.
@@ -1712,16 +1767,22 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the energy gains curve...')
+        if show_title:
+            title='Energy gains Curve' 
+        else:
+            title=None
         _plot_step_function(
                 self.iterations_history,
                 self.total_energy_gains_history[:-1],
-                title='Energy gains Curve', 
+                title=title,
                 xlabel='Iterations', 
                 ylabel='Energy gains', 
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
-    def plot_energy_gains_evolution(self, filename=None, verbose=True):
+    def plot_energy_gains_evolution(self, filename=None, dpi=1200,
+            show_title=True, verbose=True):
         """Plot the evolution of the jump energy gains over the iterations.
 
         :file: string with the name of the file where the graph is saved, if
@@ -1734,18 +1795,23 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the evolution of the jump energy gains...')
+        if show_title:
+            title='Evolution of the Energy Gains of the Jumps' 
+        else:
+            title=None
         _plot_scatter(
                 self.iterations_history,
                 self.energy_gains_history,
-                'Evolution of the Energy Gains of the Jumps',
+                title,
                 'Iterations',
                 'Energy gains',
                 regression=False,
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
         
-    def plot_bounds(self, filename=None, bounds=True, differences=True, 
-            verbose=True):
+    def plot_bounds(self, filename=None, bounds=True, differences=True,
+            show_title=True, dpi=1200, verbose=True):
         """Plot the lower and upper bounds of the total energy gains for each
         level of expenses. Also plot the difference between the lower and upper
         bounds.
@@ -1762,6 +1828,10 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the bounds of the total energy gains...')
+        if show_title:
+            title='Energy gains bounds' 
+        else:
+            title=None
         # Initiate the graph.
         fig, ax = plt.subplots()
         # The x-coordinates are the expenses history.
@@ -1770,17 +1840,16 @@ class AlgorithmResults:
         y = self.total_energy_gains_history
         if bounds:
             # The upper bounds are an offset efficiency curve.
-            ax.step(x, self.total_energy_gains_history, 'g', where='pre', 
-                    label='Upper bounds', color=color1)
+            ax.step(x, y, where='pre', label='Upper bounds', color=color1)
             # The lower bounds are the efficiency curve.
-            ax.step(x, self.total_energy_gains_history, 'r', where='post', 
-                    label='Lower bounds', color=color2)
+            ax.step(x, y, where='post', label='Lower bounds', color=color2)
         if differences:
             # Plot the bound differences.
             ax.step(x, self.bound_differences, 'b', where='post', 
                     label='Bound differences', color=color3)
         # Add the title and the axis label.
-        ax.set_title('Energy gains bounds')
+        if title:
+            ax.set_title(title)
         ax.set_xlabel('Expenses')
         ax.set_ylabel('Energy gains')
         # Display a legend.
@@ -1792,10 +1861,11 @@ class AlgorithmResults:
             plt.show()
         # Save the graph as a png file if a file is specified.
         else:
-            plt.savefig(filename, dpi=300, format='png')
+            plt.savefig(filename, dpi=dpi, format='png')
             plt.close()
 
-    def plot_individuals_who_moved(self, filename=None, verbose=True):
+    def plot_individuals_who_moved(self, filename=None, dpi=1200,
+            show_title=True, verbose=True):
         """Plot the evolution of the number of individuals who moved over the
         iterations.
 
@@ -1809,16 +1879,22 @@ class AlgorithmResults:
             self.compute_results(verbose=verbose)
         if verbose:
             print('Plotting the evolution of the number of individuals who moved...')
+        if show_title:
+            title='Number of Individuals who Moved' 
+        else:
+            title=None
         _plot_step_function(
                 self.iterations_history,
                 self.moved_history,
-                title='Number of Individuals who Moved',
+                title=title,
                 xlabel='Iterations',
                 ylabel='Number of individuals',
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
-    def plot_individuals_at_first_best(self, filename=None, verbose=True):
+    def plot_individuals_at_first_best(self, filename=None, dpi=1200,
+            show_title=True, verbose=True):
         """Plot the evolution of the number of individuals at their last
         alternative over the iterations.
 
@@ -1833,13 +1909,18 @@ class AlgorithmResults:
         if verbose:
             print(('Plotting the evolution of the number of individuals at '
                   + 'first best...'))
+        if show_title:
+            title='Number of Individuals at First Best Alternative'
+        else:
+            title=None
         _plot_step_function(
                 self.iterations_history,
                 self.at_last_alternative_history,
-                title='Number of Individuals at First Best Alternative',
+                title=title,
                 xlabel='Iterations',
                 ylabel='Number of individuals',
-                filename=filename
+                filename=filename,
+                dpi=dpi,
         )
 
 
@@ -2020,7 +2101,7 @@ def _unknown_custom_bar(main_text, counter_text):
     return bar, counter
 
 
-def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
+def _plot_step_function(x, y, title, xlabel, ylabel, filename=None, dpi=1200):
     """Plot a step function.
 
     :x: list or numpy array with the x-coordinates
@@ -2037,7 +2118,8 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
     # Plot the line.
     ax.step(x, y, 'b', where='post', color=color1)
     # Add the title and the axis label.
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     # Make room for the labels.
@@ -2047,12 +2129,13 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None):
         plt.show()
     # Save the graph as a png file if a file is specified.
     else:
-        plt.savefig(filename, dpi=300, format='png')
+        plt.savefig(filename, dpi=dpi, format='png')
         plt.close()
 
 
 def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
-        left_lim=None, right_lim=None, bottom_lim=None, top_lim=None):
+        left_lim=None, right_lim=None, bottom_lim=None, top_lim=None, dpi=1200,
+        log_scale=False):
     """Plot a scatter.
 
     :x: list or numpy array with the x-coordinates
@@ -2064,7 +2147,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     and a legend
     :file: string with the name of the file where the graph is saved, if
     None show the graph but does not save it, default is None
-
+    :log_scale: if true, the y axis is in log scale
     """
     # Initiate the graph.
     fig, ax = plt.subplots()
@@ -2080,8 +2163,15 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     # Do not show negative values on the y-axis if all values are positive.
     if ax.get_ylim()[0] < 0 and min(y) >= 0:
         ax.set_ylim(bottom=0)
+    # Change the y axis to log scale.
+    if log_scale:
+        ylabel += ' (log scale)'
+        ax.set_yscale('symlog', basey=10)
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_formatter(ScalarFormatter())
     # Add the title and the axis label.
-    ax.set_title(title)
+    if title:
+        ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     # Change the limits for the x-axis.
@@ -2100,7 +2190,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
         plt.show()
     # Save the graph as a png file if a file is specified.
     else:
-        plt.savefig(filename, dpi=300, format='png')
+        plt.savefig(filename, dpi=dpi, format='png')
         plt.close()
 
 
@@ -2134,8 +2224,8 @@ def _simulation(budget=np.infty, rem_eff=True,
 
 
 def _run_algorithm(simulation=False, filename=None, budget=np.infty,
-        remove_efficiency_dominated = True, directory='files', delimiter=',', 
-        comment='#', verbose=True, **kwargs):
+        remove_efficiency_dominated = True, directory='files', dpi=1200, 
+        show_title=True, delimiter=',', comment='#', verbose=True, **kwargs):
     """Run the algorithm and generate files and graphs.
 
     The algorithm can be run with generated data or with imported data.
@@ -2148,6 +2238,8 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
     are removed before the algorithm is run
     :directory: directory where the files are stored, must be a string, default
     is 'files'
+    :dpi: dpi used for generating the file
+    :show_title: if True, add a title on top of the graphs
     :delimiter: the character used to separated the utility and the energy
     consumption of the alternatives, default is comma
     :comment: line starting with this string are not read, should be a
@@ -2192,39 +2284,57 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
             )
     results.plot_efficiency_curve(
             filename=directory+'/efficiency_curve.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_efficiency_evolution(
             filename=directory+'/efficiency_evolution.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_expenses_curve(
             filename=directory+'/expenses_curve.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_incentives_evolution(
             filename=directory+'/incentives_evolution.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_energy_gains_curve(
             filename=directory+'/energy_gains_curve.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_energy_gains_evolution(
             filename=directory+'/energy_gains_evolution.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_bounds(
             filename=directory+'/bounds.png', 
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_individuals_who_moved(
             filename=directory+'/individuals_who_moved.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     results.plot_individuals_at_first_best(
             filename=directory+'/individuals_at_first_best.png',
-            verbose=verbose
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
             )
     # Store the total time to run the simulation.
     total_time = time.time() - init_time
@@ -2234,7 +2344,8 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
               + 's)')
 
 
-def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
+def run_simulation(budget=np.infty, directory='files', dpi=1200, verbose=True, 
+        **kwargs):
     """Create files and graphs while generating random data and running the 
     algorithm.
 
@@ -2249,10 +2360,11 @@ def run_simulation(budget=np.infty, directory='files', verbose=True, **kwargs):
     :budget: budget used to run the algorithm, by default budget is infinite
     :directory: directory where the files are stored, must be a string, default
     is 'files'
+    :dpi: dpi used for generating the file
     :verbose: if True, display progress bars and some information
 
     """
-    _run_algorithm(simulation=True, budget=budget, directory=directory, 
+    _run_algorithm(simulation=True, budget=budget, directory=directory, dpi=dpi,
             verbose=verbose, **kwargs)
 
 
@@ -2460,3 +2572,66 @@ def complexity_budget(start, stop, step, directory='complexity_budget',
     string = 'Budget'
     _complexity('budget', string, start, stop, step, directory=directory, 
             remove_pareto=remove_pareto, verbose=verbose, **kwargs)
+
+
+def distance_optimum(individuals=10, filename='distance_optimum.pdf', file=None,
+        bounds=False, title='Distance to the Optimum', verbose=True, dpi=1200, 
+        **kwargs):
+    """Run the algorithm and find the optimum on a small sample, then draw a
+    graph showing the distance of the algorithm from the optimum.
+
+    To specify the parameters for the generation process, use the same syntax as
+    for the method Data.generate().
+
+    :individuals: number of individuals in the generated data
+    :filename: string with the name of the file where the graph is saved, if
+    None show the graph but does not save it, default is None
+    :verbose: if True, a progress bar and some information are displayed during
+    the process, default is True
+
+    """
+    data = Data()
+    if file:
+        data.read(file)
+    else:
+        data.generate(individuals=individuals, verbose=verbose, **kwargs)
+    optimums = data.find_optimum(verbose=verbose)
+    alg_res = data.run_algorithm(verbose=verbose)
+    alg_res.compute_results(verbose=verbose)
+    if verbose:
+        print('Plotting the graph...')
+    # Initiate the graph.
+    fig, ax = plt.subplots()
+    # The x-coordinates are the expenses history.
+    x = alg_res.expenses_history
+    # The y-coordinates are the total energy gains history.
+    y = alg_res.total_energy_gains_history
+    if bounds:
+            # The upper bounds are an offset efficiency curve.
+            ax.step(x, y, where='pre', label='Algorithm upper bounds', 
+                    color=color1)
+            # The lower bounds are the efficiency curve.
+            ax.step(x, y, where='post', label='Algorithm lower bounds', 
+                    color=color2)
+    else:
+        # Plot the algorithm results (efficiency curve).
+        ax.step(x, y, where='post', label='Algorithm result', color=color2)
+    # Plot the optimums.
+    ax.step(optimums['cost'], optimums['energy'], where='post',
+            label='Optimum', color=color3)
+    # Add the title and the axis label.
+    if title:
+        ax.set_title(title)
+    ax.set_xlabel('Budget')
+    ax.set_ylabel('Energy gains')
+    # Display a legend.
+    plt.legend()
+    # Make room for the labels.
+    plt.tight_layout()
+    # Show the graph if no file is specified.
+    if filename is None:
+        plt.show()
+    # Save the graph as a png file if a file is specified.
+    else:
+        plt.savefig(filename, dpi=dpi, format='pdf')
+        plt.close()
