@@ -71,7 +71,7 @@ def efficiency_arrow(individual_utilities, social_utilities, current_choice,
         efficiency = int(efficiency)
     x = ( individual_utilities[next_choice] + individual_utilities[current_choice] ) / 2
     y = ( social_utilities[next_choice] + social_utilities[current_choice] ) / 2
-    ax.annotate(str(efficiency)+additional_text, (x+.02, y+.02))
+    ax.annotate(additional_text + ' (' + str(efficiency) + ')', (x+.02, y+.02))
     ax.annotate("",
             xy = (individual_utilities[current_choice], social_utilities[current_choice]),
             xytext = (individual_utilities[next_choice], social_utilities[next_choice]),
@@ -82,9 +82,9 @@ def efficiency_arrow(individual_utilities, social_utilities, current_choice,
 x3 = [4, 3, 2, 1]
 x2 = [6, 5, 4, 3]
 x1 = [8, 7, 6, 5]
-y1 = [0, 1, 7, 10]
-y2 = [0, 5, 6, 10]
-y3 = [0, 4, 6, 7]
+y1 = [1, 2, 8, 11]
+y2 = [1, 6, 7, 11]
+y3 = [1, 5, 7, 8]
 x1i = 0
 x2i = 0
 x3i = 0
@@ -123,15 +123,15 @@ scatter_choices(
 )
 
 efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=0,
-        next_choice=2, ax=ax, additional_text=' (III)')
+        next_choice=2, ax=ax, additional_text='III')
 efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=2,
-        next_choice=3, ax=ax, additional_text=' (IV)')
+        next_choice=3, ax=ax, additional_text='IV')
 efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=0,
-        next_choice=1, ax=ax, additional_text=' (I)')
+        next_choice=1, ax=ax, additional_text='I')
 efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=1,
-        next_choice=3, ax=ax, additional_text=' (V)')
+        next_choice=3, ax=ax, additional_text='V')
 efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=0,
-        next_choice=1, ax=ax, additional_text=' (II)')
+        next_choice=1, ax=ax, additional_text='II')
 #efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=1,
         #next_choice=2, ax=ax, additional_text=' (VI)')
 #efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=2,
@@ -143,4 +143,7 @@ ax.set_title('')
 ax.set_xlabel('Individual utility')
 ax.set_ylabel('Social utility')
 
-plt.savefig('algorithm-schema.png', dpi=1200, format='png')
+ax.set_xlim(left=0)
+ax.set_ylim(bottom=0)
+
+plt.savefig('algorithm-schema.pdf', dpi=600, format='pdf')
