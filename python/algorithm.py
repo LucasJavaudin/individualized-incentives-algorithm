@@ -12,6 +12,7 @@ import os
 import itertools
 
 from scipy.spatial import ConvexHull
+from scipy.optimize import curve_fit
 from matplotlib.ticker import ScalarFormatter
 
 # Define colors for the graphs.
@@ -951,7 +952,7 @@ class Data:
             self.sort(verbose=verbose)
         # Remove the Pareto-dominated alternatives.
         if not self.pareto_dominated_removed and remove_pareto:
-            self.remove_efficiency_dominated(verbose=verbose)
+            self.remove_pareto_dominated(verbose=verbose)
         # Store the starting time.
         init_time = time.time()
         if verbose:
@@ -1631,7 +1632,7 @@ class AlgorithmResults:
         # Store the time spent to output results.
         self.output_results_time = time.time() - init_time
 
-    def plot_efficiency_curve(self, filename=None, dpi=1200, show_title=True, 
+    def plot_efficiency_curve(self, filename=None, dpi=600, show_title=True, 
             verbose=True):
         """Plot the efficiency curve with the algorithm results.
 
@@ -1657,12 +1658,13 @@ class AlgorithmResults:
                 self.total_energy_gains_history,
                 title=title,
                 xlabel='Expenses', 
-                ylabel='Energy gains', 
+                ylabel='Increase in social utility', 
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_efficiency_evolution(self, filename=None, dpi=1200,
+    def plot_efficiency_evolution(self, filename=None, dpi=600,
             show_title=True, verbose=True):
         """Plot the evolution of the jump efficiency over the iterations.
 
@@ -1690,9 +1692,10 @@ class AlgorithmResults:
                 filename=filename,
                 log_scale=True,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_expenses_curve(self, filename=None, dpi=1200, show_title=True,
+    def plot_expenses_curve(self, filename=None, dpi=600, show_title=True,
             verbose=True):
         """Plot the expenses curve with the algorithm results.
 
@@ -1720,9 +1723,10 @@ class AlgorithmResults:
                 ylabel='Expenses', 
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_incentives_evolution(self, filename=None, dpi=1200,
+    def plot_incentives_evolution(self, filename=None, dpi=600,
             show_title=True, verbose=True):
         """Plot the evolution of the jump incentives over the iterations.
 
@@ -1749,9 +1753,10 @@ class AlgorithmResults:
                 regression=False,
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_energy_gains_curve(self, filename=None, dpi=1200, show_title=True,
+    def plot_energy_gains_curve(self, filename=None, dpi=600, show_title=True,
             verbose=True):
         """Plot the energy gains curve with the algorithm results.
 
@@ -1776,12 +1781,13 @@ class AlgorithmResults:
                 self.total_energy_gains_history[:-1],
                 title=title,
                 xlabel='Iterations', 
-                ylabel='Energy gains', 
+                ylabel='Increase in social utility', 
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_energy_gains_evolution(self, filename=None, dpi=1200,
+    def plot_energy_gains_evolution(self, filename=None, dpi=600,
             show_title=True, verbose=True):
         """Plot the evolution of the jump energy gains over the iterations.
 
@@ -1804,14 +1810,15 @@ class AlgorithmResults:
                 self.energy_gains_history,
                 title,
                 'Iterations',
-                'Energy gains',
+                'Increase in social utility',
                 regression=False,
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
         
     def plot_bounds(self, filename=None, bounds=True, differences=True,
-            show_title=True, dpi=1200, verbose=True):
+            show_title=True, dpi=600, verbose=True):
         """Plot the lower and upper bounds of the total energy gains for each
         level of expenses. Also plot the difference between the lower and upper
         bounds.
@@ -1851,7 +1858,7 @@ class AlgorithmResults:
         if title:
             ax.set_title(title)
         ax.set_xlabel('Expenses')
-        ax.set_ylabel('Energy gains')
+        ax.set_ylabel('Increase in social utility')
         # Display a legend.
         plt.legend()
         # Make room for the labels.
@@ -1859,12 +1866,12 @@ class AlgorithmResults:
         # Show the graph if no file is specified.
         if filename is None:
             plt.show()
-        # Save the graph as a png file if a file is specified.
+        # Save the graph as a pdf file if a file is specified.
         else:
-            plt.savefig(filename, dpi=dpi, format='png')
+            plt.savefig(filename, dpi=dpi, format='pdf')
             plt.close()
 
-    def plot_individuals_who_moved(self, filename=None, dpi=1200,
+    def plot_individuals_who_moved(self, filename=None, dpi=600,
             show_title=True, verbose=True):
         """Plot the evolution of the number of individuals who moved over the
         iterations.
@@ -1891,9 +1898,10 @@ class AlgorithmResults:
                 ylabel='Number of individuals',
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
-    def plot_individuals_at_first_best(self, filename=None, dpi=1200,
+    def plot_individuals_at_first_best(self, filename=None, dpi=600,
             show_title=True, verbose=True):
         """Plot the evolution of the number of individuals at their last
         alternative over the iterations.
@@ -1921,6 +1929,7 @@ class AlgorithmResults:
                 ylabel='Number of individuals',
                 filename=filename,
                 dpi=dpi,
+                left_lim=0,
         )
 
 
@@ -1934,7 +1943,7 @@ class Regression:
         """Initiate variables, perform a regression and create a legend. """
         self.x = x
         self.y = y
-        self.degree = 3
+        self.func = _reg_func
         # Do a polynomial regression.
         self._polynomial_regression()
         # Create a legend.
@@ -1944,16 +1953,16 @@ class Regression:
         """Compute the coefficients, the covariance matrix, the t-statistics 
         and the significance (boolean) of a polynomial regression.
         """
-        # Compute the coefficients and the covariance matrix of the regression
-        # for a polynomial with 3 degrees.
-        self.coefficients, self.covariance = np.polyfit(self.x, 
-                                                        self.y, 
-                                                        self.degree, 
-                                                        cov=True)
+        # Compute the coefficients and the covariance matrix of the regression.
+        self.coefficients, self.covariance = curve_fit(
+                self.func, 
+                self.x,
+                self.y
+        )
         # Compute the statistical significance of the coefficients (estimate
         # divided by its standard error).
         t_statistics = []
-        for i in range(self.degree+1):
+        for i in range(len(self.coefficients)):
             t = abs(self.coefficients[i]) / self.covariance[i, i]**(1/2)
             t_statistics.append(t)
         # The coefficients are statistically significant if the t-statistic is
@@ -1962,14 +1971,15 @@ class Regression:
         self.significance = t_statistics > 1.96
         # Store the number of significant coefficients.
         self.nb_significant = sum(self.significance)
+        # Store the significant coefficients.
+        self.signi_coef = self.coefficients * self.significance
 
     def _r_squared(self):
         """Compute the R² of the regression.
         """
         # Compute the predicted values of y using only the significant
         # coefficients.
-        self.poly = np.poly1d(self.coefficients)
-        y_hat = self.poly(self.x)
+        y_hat = self.func(self.x, *self.signi_coef)
         # Compute the mean of y.
         y_bar = sum(self.y)/len(self.y)
         y_bars = np.repeat(y_bar, len(self.y))
@@ -1988,33 +1998,34 @@ class Regression:
         """
         if self.nb_significant == 0:
             self.legend = '$y$ = 0\n$R^2$=0'
-            self.poly = np.poly1d(0)
         else:
             # Create a string with the equation of the regression line.
             equation = '$y$ = '
-            # Store the value of the significant coefficients and the associated
-            # degree of x.
-            significant_coefficients = [
-                                        (self.degree-i, c) for i, c 
-                                        in enumerate(self.coefficients) 
-                                        if self.significance[i]
-                                       ]
-            # Add the value of the significant coefficient with the higher degree.
-            equation += str(round(significant_coefficients[0][1], r))
-            # Add x with its associated degree.
-            equation += ' ' + self._x_string(significant_coefficients[0][0])
-            # For the other significant coefficients (if they exist), add their
-            # value and the x associated.
-            for i in range(self.nb_significant-1):
-                # Add the sign of the coefficient.
-                if significant_coefficients[i+1][1] > 0:
-                    equation += ' + '
-                else:
-                    equation += ' - '
-                # Add the absolute value of the coefficient.
-                equation += str(abs(round(significant_coefficients[i+1][1], r)))
-                # Add the x with its associated degree.
-                equation += ' ' + self._x_string(significant_coefficients[i+1][0])
+            first = True
+            for i, coef in enumerate(self.signi_coef):
+                # Only complete the string if the coef is significant.
+                if coef != 0:
+                    # If this is the first coef, add it to the string.
+                    if first:
+                        equation += str(round(coef, r))
+                        first = False
+                    # Else, add a plus or minus sign and then the absolute value
+                    # of the coefficient.
+                    else:
+                        if coef > 0:
+                            equation += '+ '
+                        else:
+                            equation += '- '
+                        equation += str(abs(round(coef, r)))
+                    equation += ' '
+                    # Add the function of x.
+                    if i <= 2:
+                        # Case of x^2, x or 1.
+                        equation += self._x_string(2-i)
+                    if i == 3:
+                        # Case of log(x).
+                        equation += '$log(x)$'
+                    equation += ' '
             # Compute the R².
             self._r_squared()
             # The first line of the string is the equation and the second line is
@@ -2101,7 +2112,8 @@ def _unknown_custom_bar(main_text, counter_text):
     return bar, counter
 
 
-def _plot_step_function(x, y, title, xlabel, ylabel, filename=None, dpi=1200):
+def _plot_step_function(x, y, title, xlabel, ylabel, filename=None,
+        left_lim=0, right_lim=None, bottom_lim=0, top_lim=None, dpi=600):
     """Plot a step function.
 
     :x: list or numpy array with the x-coordinates
@@ -2122,19 +2134,31 @@ def _plot_step_function(x, y, title, xlabel, ylabel, filename=None, dpi=1200):
         ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    # Do not show negative values on the y-axis if all values are positive.
+    if ax.get_ylim()[0] < 0 and min(y) >= 0:
+        ax.set_ylim(bottom=0)
+    # Change the limits for the x-axis and y-axis.
+    if not left_lim is None:
+        ax.set_xlim(left=left_lim)
+    if not right_lim is None:
+        ax.set_xlim(right=right_lim)
+    if not bottom_lim is None:
+        ax.set_ylim(bottom=bottom_lim)
+    if not top_lim is None:
+        ax.set_ylim(top=top_lim)
     # Make room for the labels.
     plt.tight_layout()
     # Show the graph if no file is specified.
     if filename is None:
         plt.show()
-    # Save the graph as a png file if a file is specified.
+    # Save the graph as a pdf file if a file is specified.
     else:
-        plt.savefig(filename, dpi=dpi, format='png')
+        plt.savefig(filename, dpi=dpi, format='pdf')
         plt.close()
 
 
 def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
-        left_lim=None, right_lim=None, bottom_lim=None, top_lim=None, dpi=1200,
+        left_lim=0, right_lim=None, bottom_lim=0, top_lim=None, dpi=600,
         log_scale=False):
     """Plot a scatter.
 
@@ -2157,7 +2181,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     if regression:
         reg = Regression(x, y)
         xs = np.linspace(*ax.get_xlim(), 1000)
-        ys = reg.poly(xs)
+        ys = reg.func(xs, *reg.signi_coef)
         ax.plot(xs, ys, color=color2, label=reg.legend)
         ax.legend()
     # Do not show negative values on the y-axis if all values are positive.
@@ -2174,7 +2198,7 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
         ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    # Change the limits for the x-axis.
+    # Change the limits for the x-axis and y-axis.
     if not left_lim is None:
         ax.set_xlim(left=left_lim)
     if not right_lim is None:
@@ -2188,10 +2212,15 @@ def _plot_scatter(x, y, title, xlabel, ylabel, regression=True, filename=None,
     # Show the graph if no file is specified.
     if filename is None:
         plt.show()
-    # Save the graph as a png file if a file is specified.
+    # Save the graph as a pdf file if a file is specified.
     else:
-        plt.savefig(filename, dpi=dpi, format='png')
+        plt.savefig(filename, dpi=dpi, format='pdf')
         plt.close()
+
+
+def _reg_func(x, a, b, c, d):
+    """Define a function used to compute the regressions."""
+    return (a * x**2) + (b * x) + c + (d * np.log(x))
 
 
 def _simulation(budget=np.infty, rem_eff=True, 
@@ -2224,7 +2253,7 @@ def _simulation(budget=np.infty, rem_eff=True,
 
 
 def _run_algorithm(simulation=False, filename=None, budget=np.infty,
-        remove_efficiency_dominated = True, directory='files', dpi=1200, 
+        remove_efficiency_dominated=True, directory='files', dpi=600, 
         show_title=True, delimiter=',', comment='#', verbose=True, **kwargs):
     """Run the algorithm and generate files and graphs.
 
@@ -2283,55 +2312,55 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
             verbose=verbose
             )
     results.plot_efficiency_curve(
-            filename=directory+'/efficiency_curve.png',
+            filename=directory+'/efficiency_curve.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_efficiency_evolution(
-            filename=directory+'/efficiency_evolution.png',
+            filename=directory+'/efficiency_evolution.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_expenses_curve(
-            filename=directory+'/expenses_curve.png',
+            filename=directory+'/expenses_curve.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_incentives_evolution(
-            filename=directory+'/incentives_evolution.png',
+            filename=directory+'/incentives_evolution.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_energy_gains_curve(
-            filename=directory+'/energy_gains_curve.png',
+            filename=directory+'/energy_gains_curve.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_energy_gains_evolution(
-            filename=directory+'/energy_gains_evolution.png',
+            filename=directory+'/energy_gains_evolution.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_bounds(
-            filename=directory+'/bounds.png', 
+            filename=directory+'/bounds.pdf', 
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_individuals_who_moved(
-            filename=directory+'/individuals_who_moved.png',
+            filename=directory+'/individuals_who_moved.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
             )
     results.plot_individuals_at_first_best(
-            filename=directory+'/individuals_at_first_best.png',
+            filename=directory+'/individuals_at_first_best.pdf',
             verbose=verbose,
             dpi=dpi,
             show_title=show_title,
@@ -2344,7 +2373,7 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
               + 's)')
 
 
-def run_simulation(budget=np.infty, directory='files', dpi=1200, verbose=True, 
+def run_simulation(budget=np.infty, directory='files', dpi=600, verbose=True, 
         **kwargs):
     """Create files and graphs while generating random data and running the 
     algorithm.
@@ -2459,36 +2488,39 @@ def _complexity(varying_parameter, string, start, stop, step, budget=np.infty,
         time3 = time.time()
         running_times.append(time3 - time2)
     bar.finish()
+    # Plot the time in ms.
+    generating_times = np.array(generating_times)*1000
+    pareto_removing_times = np.array(pareto_removing_times)*1000
+    running_times = np.array(running_times)*1000
     # Plot graphs showing time complexity.
     _plot_scatter(
             X, 
-            generating_times, 
-            'Time Complexity with the '+string+ '\n(Generating Time)', 
+            generating_times,
+            '',
             string, 
-            'Generating Time',
-            filename=directory+'/generating_time.png',
+            'Generating Time (ms)',
+            filename=directory+'/generating_time.pdf',
             left_lim=start-step,
             bottom_lim=0
             )
     if remove_pareto:
         _plot_scatter(
                 X, 
-                pareto_removing_times, 
-                'Time Complexity with the '+string 
-                + '\n(Time to Remove Pareto-Dominated Alternatives)',
+                pareto_removing_times,
+                '',
                 string, 
-                'Time to Remove Pareto-Dominated Alternatives',
-                filename=directory+'/removing_pareto_dominated_times.png',
+                'Time to Remove Pareto-Dominated Alternatives (ms)',
+                filename=directory+'/removing_pareto_dominated_times.pdf',
                 left_lim=start-step,
                 bottom_lim=0
                 )
     _plot_scatter(
             X, 
-            running_times, 
-            'Time Complexity with the '+string + '\n(Running Time)',
+            running_times,
+            '',
             string, 
-            'Running Time (s)',
-            filename=directory+'/running_time.png',
+            'Running Time (ms)',
+            filename=directory+'/running_time.pdf',
             left_lim=start-step,
             bottom_lim=0
             )
@@ -2575,8 +2607,8 @@ def complexity_budget(start, stop, step, directory='complexity_budget',
 
 
 def distance_optimum(individuals=10, filename='distance_optimum.pdf', file=None,
-        bounds=False, title='Distance to the Optimum', verbose=True, dpi=1200, 
-        **kwargs):
+        bounds=False, title='Distance to the Optimum', verbose=True, dpi=600, 
+        left_lim=0, bottom_lim=0, **kwargs):
     """Run the algorithm and find the optimum on a small sample, then draw a
     graph showing the distance of the algorithm from the optimum.
 
@@ -2606,24 +2638,29 @@ def distance_optimum(individuals=10, filename='distance_optimum.pdf', file=None,
     x = alg_res.expenses_history
     # The y-coordinates are the total energy gains history.
     y = alg_res.total_energy_gains_history
-    if bounds:
-            # The upper bounds are an offset efficiency curve.
-            ax.step(x, y, where='pre', label='Algorithm upper bounds', 
-                    color=color1)
-            # The lower bounds are the efficiency curve.
-            ax.step(x, y, where='post', label='Algorithm lower bounds', 
-                    color=color2)
-    else:
-        # Plot the algorithm results (efficiency curve).
-        ax.step(x, y, where='post', label='Algorithm result', color=color2)
     # Plot the optimums.
     ax.step(optimums['cost'], optimums['energy'], where='post',
             label='Optimum', color=color3)
+    if bounds:
+            # The upper bounds are an offset efficiency curve.
+            ax.step(x, y, where='pre', label='Algorithm upper bounds', 
+                    color=color1, linestyle='dashed')
+            # The lower bounds are the efficiency curve.
+            ax.step(x, y, where='post', label='Algorithm lower bounds', 
+                    color=color2, linestyle='dashed')
+    else:
+        # Plot the algorithm results (efficiency curve).
+        ax.step(x, y, where='post', label='Algorithm result', color=color2,
+                linestyle='dashed')
+    if not left_lim is None:
+        ax.set_xlim(left=left_lim)
+    if not bottom_lim is None:
+        ax.set_ylim(bottom=bottom_lim)
     # Add the title and the axis label.
     if title:
         ax.set_title(title)
     ax.set_xlabel('Budget')
-    ax.set_ylabel('Energy gains')
+    ax.set_ylabel('Increase in social utility')
     # Display a legend.
     plt.legend()
     # Make room for the labels.
@@ -2631,7 +2668,18 @@ def distance_optimum(individuals=10, filename='distance_optimum.pdf', file=None,
     # Show the graph if no file is specified.
     if filename is None:
         plt.show()
-    # Save the graph as a png file if a file is specified.
+    # Save the graph as a pdf file if a file is specified.
     else:
         plt.savefig(filename, dpi=dpi, format='pdf')
         plt.close()
+
+
+def running_time_complexity_individuals(start, stop, step):
+    x = np.arange(start, stop, step)
+    total = np.sum(0.0028 * x**2)/1000
+    return total
+
+def running_time_complexity_alternatives(start, stop, step):
+    x = np.arange(start, stop, step)
+    total = np.sum(0.3302 * x**2 - 39.0274 * x + 1287.7034 * np.log(x))/1000
+    return total
