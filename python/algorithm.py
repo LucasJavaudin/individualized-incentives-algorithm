@@ -1932,6 +1932,53 @@ class AlgorithmResults:
                 left_lim=0,
         )
 
+    def plot_individuals_both(self, filename=None, dpi=600, show_title=True,
+            verbose=True):
+        """Plot the evolution of the number of individuals who moved and the
+        number of individuals at their last alternative over the iterations.
+
+        :file: string with the name of the file where the graph is saved, if
+        None show the graph but does not save it, default is None
+        :verbose: if True, some information are displayed during the process,
+        default is True
+
+        """
+        if not self.computed_results:
+            self.compute_results(verbose=verbose)
+        if verbose:
+            print(('Plotting the evolution of the status of individuals at '
+                  + 'first best...'))
+        # Initiate the graph.
+        fig, ax = plt.subplots()
+        # Plot the line.
+        ax.step(
+                self.iterations_history, self.at_last_alternative_history, 'b', 
+                where='post', color=color1, 
+                label='Individuals at socially optimal alternative'
+        )
+        ax.step(
+                self.iterations_history, self.moved_history, 'b', where='post', 
+                color=color2, label='Individuals who received incentives'
+        )
+        # Add the title and the axis label.
+        if show_title:
+            ax.set_title('Evolution of the Status of the Individuals')
+        ax.set_xlabel('Iterations')
+        ax.set_ylabel('Number of individuals')
+        # Change the limits for the x-axis and y-axis.
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        # Make room for the labels.
+        plt.legend()
+        plt.tight_layout()
+        # Show the graph if no file is specified.
+        if filename is None:
+            plt.show()
+        # Save the graph as a pdf file if a file is specified.
+        else:
+            plt.savefig(filename, dpi=dpi, format='pdf')
+            plt.close()
+
 
 class Regression:
 
@@ -1987,7 +2034,7 @@ class Regression:
         SSR = np.sum((y_hat - self.y)**2)
         SST = np.sum((y_bars - self.y)**2)
         # Compute the R².
-        self.R2 = SSR / SST
+        self.R2 = 1 - SSR / SST
 
     def _legend(self, r):
         """Create a string with information on the regression that can be
@@ -2365,6 +2412,12 @@ def _run_algorithm(simulation=False, filename=None, budget=np.infty,
             dpi=dpi,
             show_title=show_title,
             )
+    results.plot_individuals_both(
+            filename=directory+'/individuals_both.pdf',
+            verbose=verbose,
+            dpi=dpi,
+            show_title=show_title,
+            )
     # Store the total time to run the simulation.
     total_time = time.time() - init_time
     if verbose:
@@ -2643,15 +2696,21 @@ def distance_optimum(individuals=10, filename='distance_optimum.pdf', file=None,
             label='Optimum', color=color3)
     if bounds:
             # The upper bounds are an offset efficiency curve.
-            ax.step(x, y, where='pre', label='Algorithm upper bounds', 
-                    color=color1, linestyle='dashed')
+            ax.step(
+                    x, y, where='pre', label='Algorithm upper bounds', 
+                    color=color1, linestyle='dashed'
+            )
             # The lower bounds are the efficiency curve.
-            ax.step(x, y, where='post', label='Algorithm lower bounds', 
-                    color=color2, linestyle='dashed')
+            ax.step(
+                    x, y, where='post', label='Algorithm lower bounds', 
+                    color=color2, linestyle='dashed', marker='o', markevery=2
+            )
     else:
         # Plot the algorithm results (efficiency curve).
-        ax.step(x, y, where='post', label='Algorithm result', color=color2,
-                linestyle='dashed')
+        ax.step(
+                x, y, where='post', label='Algorithm result', color=color2,
+                linestyle='dashed', marker='o', markevery=2, markersize=4
+        )
     if not left_lim is None:
         ax.set_xlim(left=left_lim)
     if not bottom_lim is None:
@@ -2678,6 +2737,7 @@ def running_time_complexity_individuals(start, stop, step):
     x = np.arange(start, stop, step)
     total = np.sum(0.0028 * x**2)/1000
     return total
+
 
 def running_time_complexity_alternatives(start, stop, step):
     x = np.arange(start, stop, step)
