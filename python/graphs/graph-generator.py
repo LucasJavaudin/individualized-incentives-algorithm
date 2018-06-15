@@ -55,7 +55,7 @@ def scatter_choices(individual_utilities, social_utilities, current_choice,
     pass
 
 def efficiency_arrow(individual_utilities, social_utilities, current_choice,
-        next_choice, ax, additional_text=''):
+        next_choice, ax, additional_text='', thick=False):
     """Draw an arrow going from choice j to choice j+1
 
     :individual_utilities: list with the individual utility for each choice
@@ -69,13 +69,20 @@ def efficiency_arrow(individual_utilities, social_utilities, current_choice,
     efficiency = - ( social_utilities[next_choice] - social_utilities[current_choice] ) / ( individual_utilities[next_choice] - individual_utilities[current_choice] )
     if efficiency.is_integer() == True:
         efficiency = int(efficiency)
-    x = ( individual_utilities[next_choice] + individual_utilities[current_choice] ) / 2
-    y = ( social_utilities[next_choice] + social_utilities[current_choice] ) / 2
-    ax.annotate(additional_text + ' (' + str(efficiency) + ')', (x+.02, y+.02))
+    else:
+        efficiency = round(efficiency, 2)
+    x = ( 2 * individual_utilities[next_choice] + individual_utilities[current_choice] )/3
+    y = ( 2 * social_utilities[next_choice] + social_utilities[current_choice] )/3
+    ax.annotate(additional_text + ' (' + str(efficiency) + ')', (x, y))
+    if thick:
+        l = 2
+    else:
+        l = 1
     ax.annotate("",
             xy = (individual_utilities[current_choice], social_utilities[current_choice]),
             xytext = (individual_utilities[next_choice], social_utilities[next_choice]),
-            arrowprops = dict(arrowstyle = "<-", connectionstyle = "arc3", shrinkA = 6, shrinkB = 6),
+            arrowprops = dict(arrowstyle = "<-", connectionstyle = "arc3",
+                shrinkA = 6, shrinkB = 6, linewidth=l),
             )
     pass
 
@@ -100,7 +107,7 @@ scatter_choices(
         #marker=(6,2,0),
         size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
-        label='Individual 1', 
+        label='Individual A', 
         ax=ax
 )
 scatter_choices(
@@ -109,7 +116,7 @@ scatter_choices(
         #marker=(6,1,0),
         size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
-        label='Individual 2', 
+        label='Individual B', 
         ax=ax
 )
 scatter_choices(
@@ -118,24 +125,23 @@ scatter_choices(
         #marker=(4,0,0),
         size=150, transparency=.25, no_transparency=.75, 
         numbers=True, 
-        label='Individual 3', 
+        label='Individual C', 
         ax=ax
 )
 
-efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=0,
-        next_choice=2, ax=ax, additional_text='III')
-efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=2,
-        next_choice=3, ax=ax, additional_text='IV')
-efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=0,
-        next_choice=1, ax=ax, additional_text='I')
-efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=1,
-        next_choice=3, ax=ax, additional_text='V')
-efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=0,
-        next_choice=1, ax=ax, additional_text='II')
-#efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=1,
-        #next_choice=2, ax=ax, additional_text=' (VI)')
-#efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=2,
-        #next_choice=3, ax=ax, additional_text=' (VII)')
+if True:
+    efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=0,
+            next_choice=1, ax=ax, additional_text=' I', thick=True)
+    efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=0,
+            next_choice=1, ax=ax, additional_text=' II', thick=True)
+    efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=0,
+            next_choice=2, ax=ax, additional_text=' III', thick=True)
+    efficiency_arrow(individual_utilities=x1, social_utilities=y1, current_choice=2,
+            next_choice=3, ax=ax, additional_text='')
+    efficiency_arrow(individual_utilities=x2, social_utilities=y2, current_choice=1,
+            next_choice=3, ax=ax, additional_text='')
+    efficiency_arrow(individual_utilities=x3, social_utilities=y3, current_choice=1,
+            next_choice=2, ax=ax, additional_text='')
 
 ax.legend()
 
